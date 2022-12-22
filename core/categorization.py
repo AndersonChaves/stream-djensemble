@@ -6,6 +6,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from math import floor, ceil
 from itertools import cycle
+import multiprocessing
 
 def print_array(array_list):
     from matplotlib import pyplot as plt
@@ -174,6 +175,9 @@ def calculate_gld_list_from_dataset(target_dataset):
     time, lat, long = target_dataset.shape
     # print("Calculating GLD")
     gld_list = np.empty((0, 4), float)
+
+    # Create Series List
+    series_list = []
     for i in range(lat):
         print("Calculating GLDs for lat", i)
         for j in range(long):
@@ -181,8 +185,14 @@ def calculate_gld_list_from_dataset(target_dataset):
             X, _ = SeriesGenerator().manual_split_series_into_sliding_windows(
                 target_dataset[cut_start:cut_ending, i, j], time, n_steps_out=0)
             X = X.reshape((len(X[0])))
-            gld_estimators = calculate_gld_estimator_using_fmkl(X)
-            gld_list = np.append(gld_list, np.reshape(gld_estimators, (1, 4)), axis=0)
+            series_list.append(X)
+
+    gld_list = np.empty((0, 4))
+    with multiprocessing.Pool() as pool:
+        for result in pool.map(calculate_gld_estimator_using_fmkl, series_list):
+            gld_estimators = result
+            gld_estimators = np.reshape(gld_estimators, (1, 4))
+            gld_list = np.append(gld_list, gld_estimators, axis=0)
     print("GLDs calculated")
     return gld_list
 
@@ -218,8 +228,8 @@ def calculate_gld_estimator_using_fmkl(X: np.array):
                                      optimization_phase=False, shift=True, disp_fit=False)
             return param_MM[0]
         except Exception as e:
-            print(e)
-            print("GLD Error: changing initial guess...")
+            #print(e)
+            #print("GLD Error: changing initial guess...")
             continue
 
 def cluster_dataset(target_dataset):
