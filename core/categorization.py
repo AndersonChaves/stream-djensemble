@@ -173,6 +173,8 @@ def create_tiling(clustering: np.array):
 
 def calculate_gld_list_from_dataset(target_dataset):
     time, lat, long = target_dataset.shape
+    if time == 0:
+        return None
     # print("Calculating GLD")
     gld_list = np.empty((0, 4), float)
 
@@ -218,7 +220,7 @@ def calculate_gld_estimator_using_gpd(X: np.array):
 def calculate_gld_estimator_using_fmkl(X: np.array):
     # GLD Using python library
     gld = GLD('FMKL')
-    param_MM = gld.fit_MM(X, [0.5, 1], bins_hist=20, maxiter=1000, maxfun=1000, disp_fit=False)
+    #param_MM = gld.fit_MM(X, [0.5, 1], bins_hist=20, maxiter=1000, maxfun=1000, disp_fit=False)
     indexes = np.array((range(len(X))))
     while (True):
         guess = [random.randint(-2, 2), random.randint(-2, 2)]

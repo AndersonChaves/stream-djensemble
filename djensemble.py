@@ -8,21 +8,19 @@ from core.dataset_manager import DatasetManager
 from core.cluster_manager import ClusterManager
 from core.models_manager import ModelsManager
 import core.view
-from gui.event_notifier import EventNotifier
 
 MAXIMUM_COST = 999999
-
 
 class DJEnsemble:
     # --------------------------------------------------------------
     # Main High Level Functions ------------------------------------
     # --------------------------------------------------------------
 
-    def __init__(self, config_manager: ConfigManager, event_notifier: EventNotifier = EventNotifier()):
+    def __init__(self, config_manager: ConfigManager, notifier_list: list = None):
         self.query_manager = None
         self.figures_directory = "figures/"
         self.config_manager = config_manager
-        self.event_notifier = event_notifier
+        self.notifier_list = [] if notifier_list is None else notifier_list
         self.start_modules()
 
     # --------------------------------------------------------------
@@ -135,11 +133,10 @@ class DJEnsemble:
 
     def set_config_manager(self, config_manager):
         self.config_manager = config_manager
-    # --------------------------------------------------------------
-    # GUI Functions ------------------------------------------------
-    # --------------------------------------------------------------
+
     def log(self, msg):
-        self.event_notifier.notify(msg)
+        for notifier in self.notifier_list:
+            notifier.notify(msg)
 
     def update_window_visualization(self):
         query_ids = list(self.query_manager.get_all_query_ids())

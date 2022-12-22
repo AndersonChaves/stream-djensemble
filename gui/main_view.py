@@ -18,8 +18,8 @@ class MainView():
                 break
             elif event == 'Run Offline Step':
                 self.log('Running Offline step')
-                djensemble = DJEnsemble(self.global_config_manager, event_notifier=
-                                        EventNotifier(self.window, 'txt_log'))
+                djensemble = DJEnsemble(self.global_config_manager, notifier_list=
+                                        [EventNotifier(self.window, 'txt_log')])
                 djensemble.run_offline_step()
                 self.log('Offline Step Finished')
             elif event == 'Run Online Step':

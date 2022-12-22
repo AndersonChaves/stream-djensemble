@@ -17,7 +17,7 @@ class ClusterManager():
         self.clustering_behavior = self.config_manager.get_config_value("series_clustering_behavior")
         if self.clustering_algorithm=="birch":
             #self.birch = Birch(branching_factor=6, n_clusters=2, threshold=15)
-            self.birch = Birch(n_clusters=n_clusters, threshold=10)
+            self.birch = Birch(n_clusters=n_clusters)
 
     def update_clustering_local(self, update_dataset: np.array,
                                 query_manager: QueryManager):

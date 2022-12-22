@@ -20,7 +20,7 @@ def save_figure_from_matrix(matrix : np.array, title: str,
                               parent_directory='', write_values=False):
 
     matplotlib.use('TkAgg')
-    matplotlib.rcParams.update({'font.size': 15})
+    #matplotlib.rcParams.update({'font.size': 15})
     fig, ax = plt.subplots()
     ax.matshow(matrix, cmap=plt.cm.Blues)
 
@@ -48,12 +48,17 @@ def plot_graph_line(error_history, title: str,
     #plt.plot(list(range(len(error_history))), error_history)
     #plt.savefig(parent_directory + title + '.png', dpi=40)
 
-def save_figure_as_scatter_plot(x, y, clusters, title:str, parent_directory=''):
+def save_figure_as_scatter_plot(x, y, clusters, title:str, parent_directory='', annotate=False):
     matplotlib.use('TkAgg')
     figure(figsize=(8, 6), dpi=130)
-
+    matplotlib.rcParams.update({'font.size': 8})
     fig, ax = plt.subplots()
     ax.scatter(x, y, c=clusters, s=30, cmap='viridis')
+
+    if annotate:
+        for i, point in enumerate(zip(x[-25:], y[-25:])):
+            ax.annotate(i, (point[0], point[1]))
+
     fig.savefig(parent_directory + title + '.png')
     plt.close("all")
 
