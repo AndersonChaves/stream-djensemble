@@ -34,7 +34,7 @@ def calculate_silhouette_through_time(initial_instant, window_size,
 
             f.write("Frame " + str(t_instant) + ": \n")
             f.write("----Clustering: " + str(clustering) + ": \n")
-            f.write(" ".join(str(item) for item in clustering))
+            f.write(" ".join(str(item) for item in clustering)+ ": \n")
             f.write("----Local Dynamic Silhouette Score: " + str(local_dynamic_silhouette) + "\n")
             local_static_clustering_time = str(time() - start)
             f.write("----Silhouette Time: " + str(local_static_clustering_time) + "\n")
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     with open(file_name, "w") as f:
         f.write("----Number of Groups: " + str(global_number_of_groups) + "\n")
         f.write("----Global Clustering: " + str(global_clustering) + "\n")
-        f.write(" ".join(str(item) for item in global_clustering))
+        f.write(" ".join(str(item) for item in global_clustering)+ ": \n")
         f.write("----Global Silhouette Score: " + str(global_silhouette) + "\n")
         f.write("----Global Clustering Time: " + str(global_clustering_time) + "\n")
 
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         f.write("----Frame 0: ""\n")
         f.write("----Number of Groups: " + str(local_static_number_of_groups) + "\n")
         f.write("----Local static Clustering: " + str(clustering) + "\n")
-        f.write(" ".join(str(item) for item in clustering))
+        f.write(" ".join(str(item) for item in clustering)+ ": \n")
         f.write("----Local Initial Dynamic Silhouette Score: " + str(local_dynamic_silhouette) + "\n")
         f.write("----Local Static Clustering Time: " + str(local_static_clustering_time) + "\n")
 
@@ -110,7 +110,7 @@ if __name__ == '__main__':
             f.write("----STATIC CLUSTERING, DYNAMIC SILHOUETTE Frame " + str(t_instant) + ": \n")
             f.write("----Number of Groups: " + str(local_static_number_of_groups) + "\n")
             f.write("----Clustering: " + str(clustering) + "\n")
-            f.write(" ".join(str(item) for item in clustering))
+            f.write(" ".join(str(item) for item in clustering)+ ": \n")
             f.write("----Local Dynamic Silhouette Score: " + str(local_dynamic_silhouette) + "\n")
             local_static_clustering_time = str(time() - start)
             f.write("----Silhouette Time: " + str(local_static_clustering_time) + "\n")
