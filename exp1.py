@@ -14,7 +14,7 @@ global_configurations_path = "experiment-metadata/djensemble-exp1.config"
 config_manager = ConfigManager(global_configurations_path)
 
 cur_time = str(datetime.now())
-results_directory = "results/cfsr-11:16/" + cur_time + "/"
+results_directory = "results/cfsr-static_clustering_dyn_silhouette/" + cur_time + "/"
 
 if __name__ == '__main__':
     create_directory_if_not_exists(results_directory)
@@ -22,15 +22,14 @@ if __name__ == '__main__':
     # Load the Dataset
     ds_manager = DatasetManager(config_manager.get_config_value("dataset_path"))
     ds_manager.loadDataset(ds_attribute=config_manager.get_config_value("target_attribute"))
-    ds_manager.filter_by_region((11, 16), (11, 16))
+    #ds_manager.filter_by_region((11, 16), (11, 16))
 
-    # Perform Global Clustering
+    # ******************** FIRST TEST: PERFORM GLOBAL CLUSTERING **************
     start = time()
     gld_list, global_clustering, global_silhouette = ct.cluster_dataset(ds_manager.read_all_data())
     global_number_of_groups = len(set(global_clustering))
     global_clustering_time = str(time() - start)
 
-    # Prepare local cluster manager
     local_cls_manager = ClusterManager(config_manager, n_clusters=global_number_of_groups)
 
     np.save("global-gld_list-region", gld_list)
@@ -50,7 +49,44 @@ if __name__ == '__main__':
         f.write("----Global Silhouette Score: " + str(global_silhouette) + "\n")
         f.write("----Global Clustering Time: " + str(global_clustering_time) + "\n")
 
-    # Perform Local Clustering
+    # ******************** SECOND TEST: PERFORM LOCAL CLUSTERING, ANALYZE SILHOUETE Along windows **************
+    start = time()
+    gld_list, local_static_clustering, local_dynamic_silhouette = ct.cluster_dataset(ds_manager.read_window(0, 96))
+    local_static_number_of_groups = len(set(local_static_clustering))
+    local_static_clustering_time = str(time() - start)
+    print("----Local Static Clustering: ", local_static_clustering)
+    print("----Local Dynamic Silhouette Score: ", local_dynamic_silhouette)
+    print("----Local Static Clustering Time: " + local_static_clustering_time)
+
+    file_name = results_directory + "results" + cur_time + ".txt"
+    with open(file_name, "w") as f:
+        f.write("----Frame 0: ""\n")
+        f.write("----Number of Groups: " + str(local_static_number_of_groups) + "\n")
+        f.write("----Local static Clustering: " + str(local_static_clustering) + "\n")
+        f.write(" ".join(str(item) for item in local_static_clustering))
+        f.write("----Local Initial Dynamic Silhouette Score: " + str(local_dynamic_silhouette) + "\n")
+        f.write("----Local Static Clustering Time: " + str(local_static_clustering_time) + "\n")
+
+    t_instant = 96
+    while (t_instant < ((365 * 4) + 28)):
+        with open(file_name, "a") as f:
+            start = time()
+            window_series = ds_manager.read_window(t_instant, t_instant+28)
+            gld_list = ct.calculate_gld_list_from_dataset(window_series)
+            ct.normalize_gld_list(gld_list)
+            local_dynamic_silhouette = silhouette_score(gld_list, local_static_clustering)
+
+            f.write("----STATIC CLUSTERING, DYNAMIC SILHOUETTE Frame " + str(t_instant) + ": \n")
+            f.write("----Number of Groups: " + str(local_static_number_of_groups) + "\n")
+            f.write("----Clustering: " + str(local_static_clustering) + "\n")
+            f.write(" ".join(str(item) for item in local_static_clustering))
+            f.write("----Local Dynamic Silhouette Score: " + str(local_dynamic_silhouette) + "\n")
+            local_static_clustering_time = str(time() - start)
+            f.write("----Silhouette Time: " + str(local_static_clustering_time) + "\n")
+            t_instant += 28
+
+    # ******************** THIRD TEST: PERFORM DYNAMIC CLUSTERING, ANALYZE SILHOUETTE Along windows **************
+    # Perform local dynamic Clustering
     local_clustering = []
     history_gld_list = np.empty((0, 4))
     t_instant = 0
