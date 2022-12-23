@@ -27,9 +27,10 @@ class ClusterManager():
             query_dataset = update_dataset[:, x1[0]:x2[0], x1[1]:x2[1]]
             continuous_query.update_clustering(query_dataset)
 
-    def update_clustering(self, update_dataset: np.array):
-        gld_list = ct.calculate_gld_list_from_dataset(update_dataset)
-        ct.normalize_gld_list(gld_list)
+    def update_clustering(self, update_dataset: np.array, gld_list=None):
+        if gld_list is None:
+            gld_list = ct.calculate_gld_list_from_dataset(update_dataset)
+            ct.normalize_gld_list(gld_list)
         self.clustering = self.cluster_glds_using_birch(gld_list)
         return gld_list, self.clustering
 
