@@ -11,10 +11,10 @@ class ClusteringStrategy():
         return self.update_clustering(dataset)
 
     def update_clustering(self, dataset):
-        gld_list = ct.calculate_gld_list_from_dataset(dataset)
+        gld_list = ct.get_gld_series_representation_from_dataset(dataset)
         #gld_list = np.rint(np.random.rand(dataset.shape[1] * dataset.shape[2], 4) * 10) # --todo
 
-        ct.normalize_gld_list(gld_list)
+        ct.normalize_embedding_list(gld_list)
         clustering = self.cluster_using_birch(gld_list)
 
         return gld_list, clustering
