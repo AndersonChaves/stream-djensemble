@@ -14,6 +14,7 @@ class ClusterManager():
     def __init__(self, config_manager: ConfigManager, n_clusters=4):
         self.config_manager = config_manager
         self.clustering_algorithm = config_manager.get_config_value("clustering_algorithm")
+        self.embedding_method = config_manager.get_config_value("embedding_method")
         self.clustering_behavior = self.config_manager.get_config_value("series_clustering_behavior")
         if self.clustering_algorithm=="birch":
             #self.birch = Birch(branching_factor=6, n_clusters=2, threshold=15)
@@ -29,8 +30,8 @@ class ClusterManager():
 
     def update_clustering(self, update_dataset: np.array, gld_list=None):
         if gld_list is None:
-            gld_list = ct.calculate_gld_list_from_dataset(update_dataset)
-            ct.normalize_gld_list(gld_list)
+            gld_list = ct.get_embedded_series_representation(update_dataset, method=self.embedding_method)
+            ct.normalize_embedding_list(gld_list)
         self.clustering = self.cluster_glds_using_birch(gld_list)
         return gld_list, self.clustering
 
@@ -44,8 +45,8 @@ class ClusterManager():
         return gld_list, clustering
 
     def clusters_from_series(self, data_series: np.array):
-        gld_list = ct.calculate_gld_list_from_dataset(data_series)
-        ct.normalize_gld_list(gld_list)
+        gld_list = ct.get_gld_series_representation_from_dataset(data_series)
+        ct.normalize_embedding_list(gld_list)
         clustering = self.birch.predict(data_series)
         return clustering
 
