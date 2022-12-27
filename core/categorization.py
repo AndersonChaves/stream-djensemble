@@ -5,7 +5,7 @@ import random
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from math import floor, ceil
-from itertools import cycle
+from itertools import cycle, repeat
 import multiprocessing
 
 def print_array(array_list):
@@ -171,7 +171,7 @@ def create_tiling(clustering: np.array):
         x += 1
     return tiling, tile_dict
 
-def calculate_gld_list_from_dataset(target_dataset):
+def get_gld_series_representation_from_dataset(target_dataset):
     time, lat, long = target_dataset.shape
     if time == 0:
         return None
@@ -197,6 +197,46 @@ def calculate_gld_list_from_dataset(target_dataset):
             gld_list = np.append(gld_list, gld_estimators, axis=0)
     print("GLDs calculated")
     return gld_list
+
+def generate_parcorr_random_vectors(vector_size, basis_size):
+    basis = []
+    for _ in range(basis_size):
+        basis.append((np.random.rand(1,vector_size)[0] - 0.5) * 2)
+    return basis
+
+def calculate_vector_sketch(vector, basis):
+    sketch = []
+    for b in basis:
+        sketch.append(np.dot(b, vector))
+    return sketch
+
+def get_parcorr_series_representation_from_dataset(target_dataset: np.array):
+    time, lat, long = target_dataset.shape
+    if time == 0:
+        return None
+    series_size = time
+    basis_size = 5
+    parrcorr_basis = generate_parcorr_random_vectors(vector_size=series_size, basis_size=basis_size)
+
+    # Create Series List
+    series_list = []
+    for i in range(lat):
+        print("Calculating GLDs for lat", i)
+        for j in range(long):
+            cut_start, cut_ending = 0, time
+            X, _ = SeriesGenerator().manual_split_series_into_sliding_windows(
+                target_dataset[cut_start:cut_ending, i, j], time, n_steps_out=0)
+            X = X.reshape((len(X[0])))
+            series_list.append(X)
+
+    sketches_list = np.empty((0, basis_size))
+    list_parcorr_basis = list(repeat(parrcorr_basis, len(series_list)))
+    with multiprocessing.Pool() as pool:
+        for sketch in pool.starmap(calculate_vector_sketch,
+                                   zip(series_list, list_parcorr_basis)):
+            sketches_list = np.append(sketches_list, np.expand_dims(sketch, axis=0), axis=0)
+    print("Vector sketches calculated")
+    return sketches_list
 
 def calculate_gld_estimator_using_gpd(X: np.array):
     # Call GPD from R -------------------------------
@@ -234,26 +274,35 @@ def calculate_gld_estimator_using_fmkl(X: np.array):
             #print("GLD Error: changing initial guess...")
             continue
 
-def cluster_dataset(target_dataset):
-    gld_list = calculate_gld_list_from_dataset(target_dataset)
-    normalize_gld_list(gld_list)
+def get_embedded_series_representation(target_dataset, method="gld"):
+    if method == "gld":
+        series_embedding_matrix = get_gld_series_representation_from_dataset(target_dataset)
+        normalize_embedding_list(series_embedding_matrix)
+    elif method == "parcorr":
+        series_embedding_matrix = get_parcorr_series_representation_from_dataset(target_dataset)
+    else:
+        raise Exception("Clustering Method chosen has not been implemented")
+    return series_embedding_matrix
+
+def cluster_dataset(target_dataset, embedding_method):
+    series_embedding_matrix = get_embedded_series_representation(target_dataset, embedding_method)
+
     # Cluster using k-means into n clusters
-    number_of_clusters = 1
     best_silhouete = -2
-    kmeans_best_clustering = [0 for _ in range(len(gld_list))]
+    kmeans_best_clustering = [0 for _ in range(len(series_embedding_matrix))]
     for number_of_clusters in range(2, 5+1):
         kmeans = KMeans(n_clusters=number_of_clusters, random_state=0)
-        kmeans_labels = kmeans.fit_predict(gld_list)
-        silhouette_avg = silhouette_score(gld_list, kmeans_labels)
+        kmeans_labels = kmeans.fit_predict(series_embedding_matrix)
+        silhouette_avg = silhouette_score(series_embedding_matrix, kmeans_labels)
         if silhouette_avg > best_silhouete:
             kmeans_best_clustering = kmeans_labels
             best_silhouete = silhouette_avg
     print("KMeans best clustering: ", kmeans_best_clustering)
     print("KMeans best silhouete: ", best_silhouete)
-    return gld_list, kmeans_best_clustering, best_silhouete
+    return series_embedding_matrix, kmeans_best_clustering, best_silhouete
 
-def normalize_gld_list(gld_list):
-    for att in range(4):
+def normalize_embedding_list(gld_list):
+    for att in range(len(gld_list[0])):
         max_value = max(gld_list[:, att])
         scale_factor = 100 / max_value if max_value != 0 else 0
         for i, el in enumerate(gld_list):
