@@ -9,7 +9,7 @@ from .series_generator import SeriesGenerator
 from .simple_regressor import LinearRegressor
 from .convolutional_model_invoker import ConvolutionalModelInvoker
 from .categorization import calculate_centroid
-from .categorization import calculate_gld_list_from_dataset
+from .categorization import get_gld_series_representation_from_dataset
 from .dataset import Dataset
 from abc import ABC, abstractmethod
 
@@ -90,7 +90,7 @@ class Learner(ABC):
     def characterize_dataset_time_series(self, target_dataset):
         print("Calculating GLDs...")
         time, lat, long = target_dataset.shape
-        gld_list = calculate_gld_list_from_dataset(target_dataset)
+        gld_list = get_gld_series_representation_from_dataset(target_dataset)
         gld_list = np.reshape(gld_list, (lat, long, 4))  # Number of GLD parameters = 4
         print("Calculating Centroid...")
         return calculate_centroid(gld_list, (0, 0), (lat, long))
