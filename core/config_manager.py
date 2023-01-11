@@ -1,7 +1,6 @@
-class ConfigManager:
-    config_parameters = {}
-
+class ConfigManager():
     def __init__(self, config_file_path):
+        self.config_parameters = {}
         self.read_config_file(config_file_path)
 
     def read_config_file(self, config_file_path: str):
@@ -23,3 +22,8 @@ class ConfigManager:
 
     def get_parameters_dict(self):
         return self.config_parameters
+
+    def save_config_file(self, new_config_file_path: str):
+        with open(new_config_file_path, "a+") as f:
+            for parameter, value in self.config_parameters.items():
+                f.write(parameter + "    $ " + str(value) + "\n")

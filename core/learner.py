@@ -42,6 +42,8 @@ class Learner(ABC):
         self.model = model
         self.reference_dataset = None
         self.centroid = (-1, -1)
+        if model.input_shape[1] is not None:
+            self.temporal_length = model.input_shape[1]
 
     def invoke(self, X):
         #from time import time
@@ -69,6 +71,9 @@ class Learner(ABC):
         if self.reference_dataset is None:
             dataset_full_path = self.model_directory + self.model_name + '.npy'
             self.reference_dataset = (np.load(dataset_full_path))
+            if len(self.reference_dataset.shape) == 1:
+                self.reference_dataset = np.reshape(self.reference_dataset,
+                                                     (self.reference_dataset.shape[0], 1, 1))
         return self.reference_dataset
 
     def get_reference_dataset_mock(self):
@@ -125,7 +130,7 @@ class Learner(ABC):
         centroid = self.get_reference_dataset_centroid_coordinate()
         for i in range(noise_level_for_cef):
             print("Evaluating model", self.model_name, " on noise dataset ", i)
-            error.append(self.evaluate(noise_dataset[:50]))
+            error.append(self.evaluate(noise_dataset))
             distances.append(self.compare_dataset_distances(reference_dataset, noise_dataset,
                                                                 centroid, centroid))
             NoiseGenerator().add_noise(noise_dataset)
@@ -137,7 +142,7 @@ class Learner(ABC):
 
     def execute_eef(self, dataset, centroid):
         reference_dataset = self.get_reference_dataset()
-        ref_centroid = self.get_reference_dataset_centroid_coordinate()
+        ref_centroid = self.get_reference_dataset_centroid_coordinate() #todo: verificar comparação se é pelo dado ou pelos embeddings
         x = self.compare_dataset_distances(reference_dataset, dataset, ref_centroid, centroid)
         return self.r.predict(x)
 

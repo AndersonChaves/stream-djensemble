@@ -1,5 +1,5 @@
 import numpy as np
-import time
+import time, datetime
 
 import core.categorization as categorization
 from core.config_manager import ConfigManager
@@ -7,7 +7,9 @@ from core.query_manager import QueryManager
 from core.dataset_manager import DatasetManager
 from core.cluster_manager import ClusterManager
 from core.models_manager import ModelsManager
+from core.notifier import TextNotifier
 import core.view
+import core.utils as ut
 
 MAXIMUM_COST = 999999
 
@@ -16,12 +18,17 @@ class DJEnsemble:
     # Main High Level Functions ------------------------------------
     # --------------------------------------------------------------
 
-    def __init__(self, config_manager: ConfigManager, notifier_list: list = None):
+    def __init__(self, config_manager: ConfigManager, notifier_list: list = None,
+                     results_directory = ""):
         self.query_manager = None
-        self.figures_directory = "figures/"
+        self.results_directory = results_directory
+        self.figures_directory = self.results_directory + "figures/"
+        ut.create_directory_if_not_exists(self.results_directory)
+        ut.create_directory_if_not_exists(self.figures_directory)
         self.config_manager = config_manager
         self.notifier_list = [] if notifier_list is None else notifier_list
         self.start_modules()
+        self.start_time = str(datetime.datetime.now())
 
     # --------------------------------------------------------------
     # Model initialization functions -------------------------------
@@ -39,7 +46,7 @@ class DJEnsemble:
         if self.config_manager == None:
             raise ("Query Manager Initialization Error: configurations not defined")
         query_dir = self.config_manager.get_config_value("query_directory")
-        self.query_manager = QueryManager(query_dir)
+        self.query_manager = QueryManager(query_dir, self.notifier_list)
 
     def start_dataset_manager(self):
         if self.config_manager == None:
@@ -56,7 +63,7 @@ class DJEnsemble:
     def start_cluster_manager(self):
         if self.config_manager == None:
             raise ("Cluster Manager Initialization Error: No configurations defined")
-        self.cluster_manager = ClusterManager(self.config_manager)
+        self.cluster_manager = ClusterManager(self.config_manager, notifier_list=self.notifier_list)
 
     # --------------------------------------------------------------
     # Main Steps ---------------------------------------------------
@@ -64,17 +71,30 @@ class DJEnsemble:
 
     def run_offline_step(self):
         self.log("Executing offline stage... ")
-        self.start_offline = time.time()
+
+        self.log("Calculating Cost Estimation Functions... ")
+        self.start_cef = time.time()
         noise_level_for_cef = eval(self.config_manager.get_config_value("noise_level_for_cef"))
         self.update_cost_estimation_function(noise_level_for_cef)
-        self.initialized = True
-        self.log("End of offline stage, total time: " + str(time.time() - self.start_offline))
+        self.log("CEFs Calculated, total time: " + str(time.time() - self.start_cef))
 
-    def run_online_step(self, single_iteration=True):
-        t_start = eval(self.config_manager.get_config_value("dataset_start"))
-        clustering_offset = eval(self.config_manager.get_config_value("clustering_offset"))
+        if self.config_manager.get_config_value("clusterization_mode") == 'static':
+            static_clusterization_range = eval(self.config_manager.get_config_value("static_clusterization_range"))
+            self.log("Performing Global Clustering and Tiling: Frame" + str(0) + " to " + str(static_clusterization_range))
+            self.start_global_clustering = time.time()
+            self.cluster_manager.perform_global_static_clustering(self.dataset_manager.read_window(0, static_clusterization_range))
+
+            self.cluster_manager.perform_global_static_tiling(
+                self.dataset_manager.read_window(0, static_clusterization_range))
+            self.log("Global Clustering and Tiling Performed, total time: " + str(time.time() - self.start_global_clustering))
+
+        self.initialized = True
+        self.log("End of offline stage, total time: " + str(time.time() - self.start_cef))
+
+    def run_online_step(self, single_iteration=True, t_start=-1):
+        if t_start == -1:
+            t_start = eval(self.config_manager.get_config_value("dataset_start"))
         window_size = eval(self.config_manager.get_config_value("window_size"))
-        predictive_length = eval(self.config_manager.get_config_value("predictive_length"))
         self.clustering_behavior = self.config_manager.get_config_value("series_clustering_behavior")
         self.start_online = time.time()
         self.log("Measuring online statistics... ")
@@ -85,9 +105,17 @@ class DJEnsemble:
             self.log("--- Reading new Record t: " + str(self.t_current))
             data_matrix = self.read_record(self.t_current)
             self.data_buffer = np.concatenate((self.data_buffer, np.expand_dims(data_matrix, axis=0)), axis=0)
+
+            start_frame_visualization = time.time()
             self.update_frame_visualization()
+            self.log("Time generating visualization: " + str(time.time()-start_frame_visualization))
+
             if len(self.data_buffer) >= window_size:
-                self.update_clusters(self.data_buffer)
+                if self.config_manager.get_config_value("clusterization_mode") == 'dynamic':
+                    start_clusterization = time.time()
+                    self.update_clusters_online(self.data_buffer)
+                    self.log("Time for Clusterization: " + str(time.time() - start_clusterization))
+
                 self.perform_continuous_queries(self.query_manager, self.data_buffer,
                                                 self.models_manager, self.dataset_manager)
                 self.evaluate_error(self.read_record(self.t_current+1), self.query_manager)
@@ -97,6 +125,7 @@ class DJEnsemble:
                     data_stream_active = False
             self.t_current += 1
         self.log("Iteration took " + str(time.time() - self.start_online) + "secs")
+        self.save_configurations()
 
     def get_buffer_shape(self):
         return (0,) + self.dataset_manager.get_spatial_shape()
@@ -111,24 +140,25 @@ class DJEnsemble:
     # --------------------------------------------------------------
     # Online Functions ---------------------------------------------
     # --------------------------------------------------------------
-    def categorize_dataset(self, dataset: np.array):
-        return categorization.categorize_dataset(dataset)
 
     def read_record(self, t_current):
         return self.dataset_manager.read_instant(t_current)
 
-    def update_clusters(self, data_buffer: np.array):
-        if self.cluster_manager.clustering_behavior == 'query':
+    def update_clusters_online(self, data_buffer: np.array):
+        if self.cluster_manager.clustering_behavior == 'local':
             self.cluster_manager.update_clustering_local(data_buffer, self.query_manager)
+        else:
+            self.cluster_manager.update_global_clustering(data_buffer) # Not tested yet
 
     def perform_continuous_queries(self, query_manager, data_buffer, models_manager, dataset_manager):
-        query_manager.execute_queries(data_buffer, models_manager, dataset_manager)
-        pass
+        self.log("Executing query: Window Allocation t=" + str(self.t_current))
+        query_manager.execute_queries(data_buffer, models_manager, dataset_manager, self.cluster_manager)
 
     def evaluate_error(self, real_next_frame, query_manager: QueryManager):
         for query_id in self.query_manager.get_all_query_ids():
             continuous_query = self.query_manager.get_continuous_query(query_id)
-            query_next_frame = self.dataset_manager.filter_frame_by_query_region(real_next_frame, continuous_query)
+            x1, x2 = continuous_query.get_query_endpoints()
+            query_next_frame = self.dataset_manager.filter_frame_by_query_region(real_next_frame, x1, x2)
             continuous_query.update_rmse(query_next_frame)
 
     def set_config_manager(self, config_manager):
@@ -142,21 +172,29 @@ class DJEnsemble:
         query_ids = list(self.query_manager.get_all_query_ids())
         continuous_query = self.query_manager.get_continuous_query(query_ids[0])
         self.log("Generating visualization: clustering")
-        clustering = continuous_query.get_current_clustering()
+        if self.cluster_manager.is_global_clustering():
+            clustering = self.cluster_manager.clustering
+        else:
+            clustering = continuous_query.get_current_clustering()
         core.view.save_figure_from_matrix(clustering, "clustering",
-                                          parent_directory = 'figures/', write_values = True)
+                                          parent_directory = self.figures_directory, write_values = True)
 
         self.log("Generating visualization: tiling")
-        tiling = continuous_query.get_tiling()
+        if self.cluster_manager.is_global_clustering():
+            tiling = self.cluster_manager.tiling
+        else:
+            start_tiling = time.time()
+            tiling = continuous_query.get_tiling()
         core.view.save_figure_from_matrix(tiling, "tiling",
-                                          parent_directory='figures/', write_values=True)
+                                          parent_directory=self.figures_directory, write_values=True)
 
         self.log("Generating visualization: current frame")
         core.view.save_figure_from_matrix(self.data_buffer[-1],
                                           self.figures_directory +"current-frame")
 
         real_next_frame = self.read_record(self.t_current+1)
-        query_next_frame = self.dataset_manager.filter_frame_by_query_region(real_next_frame, continuous_query)
+        x1, x2 = continuous_query.get_query_endpoints()
+        query_next_frame = self.dataset_manager.filter_frame_by_query_region(real_next_frame, x1, x2)
 
         self.log("Generating visualization: predicted frame")
         core.view.save_figure_from_matrix(continuous_query.get_predicted_series()[-1],
@@ -182,3 +220,7 @@ class DJEnsemble:
         self.log("Generating visualization: current frame")
         core.view.save_figure_from_matrix(self.data_buffer[-1],
                                           self.figures_directory + "current-frame")
+
+    def save_configurations(self):
+        self.config_manager.save_config_file(self.results_directory + "configurations")
+        self.query_manager.save_query_configurations(self.results_directory)

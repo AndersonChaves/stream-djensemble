@@ -57,8 +57,7 @@ class DatasetManager:
     def get_spatial_shape(self):
         return self.accessor.get_spatial_shape(self.ds)
 
-    def filter_frame_by_query_region(self, dataset, continuous_query):
-        x1, x2 = continuous_query.get_query_endpoints()
+    def filter_frame_by_query_region(self, dataset, x1, x2):
         data_window = dataset[x1[0]:x2[0], x1[1]:x2[1]]
         return data_window
 

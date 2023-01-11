@@ -8,47 +8,89 @@ from .query_manager import QueryManager
 #from query_manager import QueryManager
 #from dataset_manager import DatasetManager
 from .series_generator import SeriesGenerator
+import time
 
 
 class ClusterManager():
-    def __init__(self, config_manager: ConfigManager, n_clusters=4):
+    def __init__(self, config_manager: ConfigManager, n_clusters=4, notifier_list = None):
+        self.notifier_list = []
+        if notifier_list is not None:
+            self.notifier_list = notifier_list
         self.config_manager = config_manager
         self.clustering_algorithm = config_manager.get_config_value("clustering_algorithm")
-        self.embedding_method = config_manager.get_config_value("embedding_method")
+        self.embedding_method = config_manager.get_config_value("global_embedding_method")
         self.clustering_behavior = self.config_manager.get_config_value("series_clustering_behavior")
         if self.clustering_algorithm=="birch":
             #self.birch = Birch(branching_factor=6, n_clusters=2, threshold=15)
             self.birch = Birch(n_clusters=n_clusters)
 
+    def is_global_clustering(self) -> bool:
+        return self.clustering_behavior == 'global'
+
     def update_clustering_local(self, update_dataset: np.array,
                                 query_manager: QueryManager):
         for query_id in query_manager.get_all_query_ids():
+            start_update_clustering = time.time()
             continuous_query = query_manager.get_continuous_query(query_id)
             x1, x2 = continuous_query.get_query_endpoints()
             query_dataset = update_dataset[:, x1[0]:x2[0], x1[1]:x2[1]]
             continuous_query.update_clustering(query_dataset)
 
-    def update_clustering(self, update_dataset: np.array, gld_list=None):
-        if gld_list is None:
-            gld_list = ct.get_embedded_series_representation(update_dataset, method=self.embedding_method)
-            ct.normalize_embedding_list(gld_list)
-        self.clustering = self.cluster_glds_using_birch(gld_list)
-        return gld_list, self.clustering
+            self.log("--CLUSTERING--Updated local clustering: query" + str(query_id) + ":" + \
+              str(time.time() - start_update_clustering))
 
-    def cluster_glds_using_birch(self, gld_list: np.array):
+    def update_global_clustering(self, update_dataset: np.array, embeddings_list=None):
+        start_update_clustering = time.time()
+        if embeddings_list is None:
+            embeddings_list = ct.get_embedded_series_representation(update_dataset, method=self.embedding_method)
+            ct.normalize_embedding_list(embeddings_list)
+        self.clustering = self.cluster_embeddings_using_birch(embeddings_list)
+
+        self.log("--GLOBAL CLUSTERING--Updated global clustering, method" + self.embedding_method + \
+                 str(time.time() - start_update_clustering))
+
+    def cluster_embeddings_using_birch(self, gld_list: np.array):
         self.birch = self.birch.partial_fit(gld_list)
         clustering = self.birch.predict(gld_list)
         return clustering
 
-    def perform_global_clustering(self, data_frame_series: np.array):
-        gld_list, clustering = ct.cluster_dataset(data_frame_series)
-        return gld_list, clustering
+    def perform_global_static_clustering(self, data_frame_series: np.array):
+        self.log("Start static clusterization")
+        start_initialize_clustering = time.time()
+        self.global_series_embedding, self.clustering, self.best_silhouette = ct.cluster_dataset(data_frame_series, self.embedding_method)
+        self.clustering = np.reshape(self.clustering, newshape=data_frame_series.shape[1:])
+        new_emb_shape = data_frame_series.shape[1:] + tuple([self.global_series_embedding.shape[1]]) # todo verify if it works for parcorr
+        self.global_series_embedding = np.reshape(self.global_series_embedding, newshape=new_emb_shape)
+        self.log("--GLOBAL STATIC CLUSTERING--Initialized static global clustering: " + \
+                 str(time.time() - start_initialize_clustering))
+
+    def perform_global_static_tiling(self, data_frame_series: np.array):
+        # self.perform_global_static_clustering(data_frame_series)
+        start_initialize_tiling = time.time()
+        if self.global_series_embedding is None:
+            raise("Error: Must perform static clusterization before static tiling")
+        self.log("Start static clusterization")
+        emb_frame = self.global_series_embedding
+        tiling_method = self.config_manager.get_config_value("global_tiling_method")
+        purity = float(self.config_manager.get_config_value("global_min_tiling_purity_rate"))
+        self.log("--GLOBAL STATIC TILING--Initialized clustering method " + ": " + \
+                 str(time.time() - start_initialize_tiling))
+
+        self.tiling, self.tiling_metadata = ct.perform_tiling(emb_frame, self.clustering, tiling_method, purity)
+        return self.tiling, self.tiling_metadata
+
+    def get_tiling_metadata(self):
+        return self.tiling_metadata
 
     def clusters_from_series(self, data_series: np.array):
         gld_list = ct.get_gld_series_representation_from_dataset(data_series)
         ct.normalize_embedding_list(gld_list)
         clustering = self.birch.predict(data_series)
         return clustering
+
+    def log(self, msg):
+        for notifier in self.notifier_list:
+            notifier.notify(msg)
 
 def test_prepare_dummy_array():
     # Prepare dummy array
@@ -66,7 +108,7 @@ def test_prepare_dummy_array():
 
 def test_perform_global_clustering(dummy_array):
     gld_list, global_clustering = ClusterManager(
-        ConfigManager("../experiment-metadata/djensemble-exp1.config")).perform_global_clustering(dummy_array[:10])
+        ConfigManager("../experiment-metadata/djensemble-exp1.config")).perform_global_static_clustering(dummy_array[:10])
     return global_clustering
 
 def test_prepare_dataset_for_online_clustering(dummy_array):
@@ -86,7 +128,7 @@ def test_dummy_array():
     local_clustering = []
     history_gld_list = np.empty((0, 4))
     for i, fs in enumerate(frame_window_series):
-        gld_list, local_clustering = local_cls_manager.update_clustering(fs)
+        gld_list, local_clustering = local_cls_manager.update_global_clustering(fs)
 
         history_gld_list = np.concatenate((history_gld_list, gld_list), axis=0)
         history_clustering = local_cls_manager.birch.predict(history_gld_list)

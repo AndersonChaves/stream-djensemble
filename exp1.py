@@ -129,7 +129,7 @@ if __name__ == '__main__':
                 break
             gld_list = next(it_gld_list)
             local_cls_manager = ClusterManager(config_manager, n_clusters=local_static_number_of_groups)
-            gld_list, local_clustering = local_cls_manager.update_clustering(frame_window_series, gld_list)
+            gld_list, local_clustering = local_cls_manager.update_global_clustering(frame_window_series, gld_list)
             f.write("----Test 3: PERFORM DYNAMIC CLUSTERING, ANALYZE SILHOUETTE Along windows\n")
             f.write("----Local Clustering t = " + str(t_instant) + " to " + str(t_instant + 28) + ": " + "\n")
             f.write(" ".join(str(item) for item in local_clustering) + "\n")

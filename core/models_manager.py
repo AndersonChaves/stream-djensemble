@@ -25,12 +25,12 @@ class ModelsManager():
         for file in os.listdir(self.temp_models_path):
             if file.endswith(".h5"):
                 model_name = file[:-3]
-                model_list.append(self.load_model(model_name))
+                model_list.append(self.load_temporal_model(model_name))
         return model_list
 
     def load_all_convolutional_models(self):
         models_names = self.get_names_of_models_in_dir(self.conv_models_path)
-        models_list = [self.load_model(model) for model in models_names]
+        models_list = [self.load_convolutional_model(model) for model in models_names]
         return models_list
 
     def load_model(self, model_name):
