@@ -1,0 +1,19 @@
+#Models
+temporal_models_path                $ models/temporal/rio/
+convolutional_models_path           $ models/spatio-temporal/rio/
+
+query_region                        $ {"lat": (1, 5), "long": (1, 5)}
+target_attribute                    $ rain
+output_file_name                    $ results/query-rain
+
+#Query
+min_tile_length                     $ 6
+threshold                           $ 20.0
+number_of_samples                   $ 100
+prediction-length                   $ 1
+
+multiply_number_of_executions       $ N
+normalize_values                    $ N
+embedding_method                    $ parcorr
+tiling_method                       $ quadtree
+min_tiling_purity_rate              $ 0.9
