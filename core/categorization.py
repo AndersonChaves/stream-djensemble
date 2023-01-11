@@ -7,6 +7,7 @@ from sklearn.metrics import silhouette_score
 from math import floor, ceil
 from itertools import cycle, repeat
 import multiprocessing
+from .quad_tree import QuadTree
 
 def print_array(array_list):
     from matplotlib import pyplot as plt
@@ -154,7 +155,7 @@ def expand_tile(tiling: np.array, clustering: np.array, start: tuple,
             dir_remaining -= 1
     return {"start": start, "end": end}
 
-def create_tiling(clustering: np.array):
+def create_yolo_tiling(clustering: np.array, min_purity_rate: int):
     shp = clustering.shape
     lat, long = shp
     tiling = np.full(shp, -1)
@@ -165,11 +166,18 @@ def create_tiling(clustering: np.array):
         y = 0
         while y < long:
             if tiling[x, y] == -1:
-                tile_dict[tile_id] = expand_tile(tiling, clustering, (x, y), tile_id)
+                tile_dict[tile_id] = expand_tile(tiling, clustering, (x, y), tile_id,
+                                                 max_impurity_rate=1 - min_purity_rate)
                 tile_id += 1
             y += 1
         x += 1
     return tiling, tile_dict
+
+def create_quadtree_tiling(clustering: np.array, min_purity_rate):
+    quadtree = QuadTree(clustering, min_purity=min_purity_rate)
+    tiling = quadtree.get_all_quadrants()
+    tiling_dict = quadtree.get_all_quadrant_limits()
+    return tiling, tiling_dict
 
 def get_gld_series_representation_from_dataset(target_dataset):
     time, lat, long = target_dataset.shape
@@ -221,7 +229,7 @@ def get_parcorr_series_representation_from_dataset(target_dataset: np.array):
     # Create Series List
     series_list = []
     for i in range(lat):
-        print("Calculating GLDs for lat", i)
+        print("Calculating parcorr embedding for lat", i)
         for j in range(long):
             cut_start, cut_ending = 0, time
             X, _ = SeriesGenerator().manual_split_series_into_sliding_windows(
@@ -274,7 +282,7 @@ def calculate_gld_estimator_using_fmkl(X: np.array):
             #print("GLD Error: changing initial guess...")
             continue
 
-def get_embedded_series_representation(target_dataset, method="gld"):
+def get_embedded_series_representation(target_dataset, method):
     if method == "gld":
         series_embedding_matrix = get_gld_series_representation_from_dataset(target_dataset)
         normalize_embedding_list(series_embedding_matrix)
@@ -310,38 +318,45 @@ def normalize_embedding_list(gld_list):
     return gld_list
 
 def calculate_centroid(clustering, start, end):
-    tile_glds = clustering[start[0]:end[0]+1, start[1]:end[1]+1]
-    t_shp = tile_glds.shape
-    centroid_gld = [np.average(tile_glds[:, :, p]) for p in range(4)]
+    tile_embedd = clustering[start[0]:end[0]+1, start[1]:end[1]+1]
+    if len(tile_embedd.shape) == 3:
+        t_shp = tile_embedd.shape
+    else:
+        t_shp = tile_embedd.shape + tuple([1])
+
+    centroid_gld = [np.average(tile_embedd[:, :, p]) for p in range(t_shp[2])]
 
     from sklearn.metrics import pairwise_distances_argmin_min
     c, _ = pairwise_distances_argmin_min(np.reshape(centroid_gld, (1, -1)),
-                                     np.reshape(tile_glds, (t_shp[0] * t_shp[1], 4)))
+                                     np.reshape(tile_embedd, (t_shp[0] * t_shp[1], t_shp[2])))
     print("Centroid: ", c)
     centroid = c // t_shp[1], c % t_shp[1]
     # Returns the centroid position relative to the tile
     return centroid
 
-def categorize_dataset(target_dataset):
+def categorize_dataset(target_dataset, method, min_purity_rate):
     time, lat, long = target_dataset.shape
-    gld_list, kmeans_best_clustering = cluster_dataset(target_dataset)
+    gld_list, kmeans_best_clustering, best_silhouette = cluster_dataset(target_dataset=target_dataset, embedding_method="gld")
     clustering_reshaped = np.reshape(kmeans_best_clustering, newshape=(lat, long))
-    perform_yolo_tiling(target_dataset, clustering_reshaped)
-    #clustering_reshaped = kmeans_best_clustering
+    return perform_tiling(target_dataset, clustering_reshaped, method, min_purity_rate=min_purity_rate)
 
-def perform_yolo_tiling(gld_frame, clustering_frame):
-    tiling, tile_dict = create_tiling(clustering_frame)
+def perform_tiling(embedding_frame, clustering_frame, method, min_purity_rate):
+    if method == "yolo":
+        tiling, tile_dict = create_yolo_tiling(clustering_frame, min_purity_rate)
+    elif method == "quadtree":
+        tiling, tile_dict = create_quadtree_tiling(clustering_frame, min_purity_rate)
+    else:
+        raise Exception("Tiling Error: Define the tiling method")
     #print_array([clustering_frame, tiling])
     save_clustering(clustering_frame)
-    tile_dim_dict = {}
+    tiling_metadata = {}
     for tile_id, value in tile_dict.items():
-        tile_dim_dict[tile_id] = {}
+        tiling_metadata[tile_id] = {}
         start, end = value['start'], value['end']
-        tile_dim_dict[tile_id]["lat"] = (start[0], end[0])
-        tile_dim_dict[tile_id]["long"] = (start[1], end[1])
-        tile_dim_dict[tile_id]["centroid"] = calculate_centroid(gld_frame,
-                                                                start, end)
-    return tiling, tile_dim_dict
+        tiling_metadata[tile_id]["lat"] = (start[0], end[0])
+        tiling_metadata[tile_id]["long"] = (start[1], end[1])
+        tiling_metadata[tile_id]["centroid"] = calculate_centroid(embedding_frame, start, end)
+    return tiling, tiling_metadata
 
 def save_clustering(clustering):
     np.save("results/clustering.npy", clustering)
@@ -385,7 +400,7 @@ def test_tiling():
                            [1, 1, 1, 1, 0],
                            [1, 1, 1, 0, 0],
                            [1, 0, 1, 0, 0]])
-    create_tiling(clustering)
+    create_yolo_tiling(clustering)
 
 def custom_made_tiling():
     tiling = [[0, 0, 0, 0, 1, 1, 1],
