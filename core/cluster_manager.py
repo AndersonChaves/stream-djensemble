@@ -1,15 +1,10 @@
-from numpy import reshape
 from sklearn.cluster import Birch
 import core.categorization as ct
 import numpy as np
 from .config_manager import ConfigManager
 from .query_manager import QueryManager
-#from config_manager import ConfigManager
-#from query_manager import QueryManager
-#from dataset_manager import DatasetManager
 from .series_generator import SeriesGenerator
 import time
-
 
 class ClusterManager():
     def __init__(self, config_manager: ConfigManager, n_clusters=4, notifier_list = None):
@@ -20,9 +15,11 @@ class ClusterManager():
         self.clustering_algorithm = config_manager.get_config_value("clustering_algorithm")
         self.embedding_method = config_manager.get_config_value("global_embedding_method")
         self.clustering_behavior = self.config_manager.get_config_value("series_clustering_behavior")
+        self.tiling_metadata = {}
         if self.clustering_algorithm=="birch":
             #self.birch = Birch(branching_factor=6, n_clusters=2, threshold=15)
             self.birch = Birch(n_clusters=n_clusters)
+        self.tiling_is_updated = False
 
     def is_global_clustering(self) -> bool:
         return self.clustering_behavior == 'global'
@@ -44,7 +41,8 @@ class ClusterManager():
         if embeddings_list is None:
             embeddings_list = ct.get_embedded_series_representation(update_dataset, method=self.embedding_method)
             ct.normalize_embedding_list(embeddings_list)
-        self.clustering = self.cluster_embeddings_using_birch(embeddings_list)
+            self.global_series_embedding = embeddings_list
+        self.clustering = self.cluster_embeddings_using_birch(self.global_series_embedding)
 
         self.log("--GLOBAL CLUSTERING--Updated global clustering, method" + self.embedding_method + \
                  str(time.time() - start_update_clustering))
@@ -63,6 +61,7 @@ class ClusterManager():
         self.global_series_embedding = np.reshape(self.global_series_embedding, newshape=new_emb_shape)
         self.log("--GLOBAL STATIC CLUSTERING--Initialized static global clustering: " + \
                  str(time.time() - start_initialize_clustering))
+        self.tiling_is_updated = False
 
     def perform_global_static_tiling(self, data_frame_series: np.array):
         # self.perform_global_static_clustering(data_frame_series)
@@ -80,6 +79,12 @@ class ClusterManager():
         return self.tiling, self.tiling_metadata
 
     def get_tiling_metadata(self):
+        if not self.tiling_is_updated:
+            emb_frame = self.global_series_embedding
+            tiling_method = self.config_manager.get_config_value("global_tiling_method")
+            purity = float(self.config_manager.get_config_value("global_min_tiling_purity_rate"))
+            self.tiling, self.tiling_metadata = ct.perform_tiling(emb_frame, self.clustering, tiling_method, purity)
+            self.tiling_is_updated = True
         return self.tiling_metadata
 
     def clusters_from_series(self, data_series: np.array):
