@@ -292,13 +292,13 @@ def get_embedded_series_representation(target_dataset, method):
         raise Exception("Clustering Method chosen has not been implemented")
     return series_embedding_matrix
 
-def cluster_dataset(target_dataset, embedding_method):
+def cluster_dataset(target_dataset, embedding_method, min_clusters=2):
     series_embedding_matrix = get_embedded_series_representation(target_dataset, embedding_method)
 
     # Cluster using k-means into n clusters
     best_silhouete = -2
     kmeans_best_clustering = [0 for _ in range(len(series_embedding_matrix))]
-    for number_of_clusters in range(2, 5+1):
+    for number_of_clusters in range(min_clusters, 5+1):
         kmeans = KMeans(n_clusters=number_of_clusters, random_state=0)
         kmeans_labels = kmeans.fit_predict(series_embedding_matrix)
         silhouette_avg = silhouette_score(series_embedding_matrix, kmeans_labels)
