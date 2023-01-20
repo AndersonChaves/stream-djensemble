@@ -11,14 +11,26 @@ config_manager = ConfigManager("experiment-metadata/exp3-clustering-rain-radar-f
 embedding_method = config_manager.get_config_value("embedding_method")
 cur_time = str(datetime.now())
 ds_name = config_manager.get_config_value("ds_name")
-clustering_region = (10, 14) # For both Lat and Long
+#clustering_region = (10, 14) # For both Lat and Long
 clustering_region = (-1, -1) # if the whole dataset, uncomment
+
+# Clustering period CFSR
+#clustering_start, window_size = int((1460 / 4) * 0), int(1460 / 4) # summer south hemisphere
+# clustering_start, window_size = int(0), int(1460) # whole dataset
+#clustering_start, window_size = int((1460 / 4) * 2), int(1460 / 4) # winter south hemisphere
+
+# Clustering period Radar-France
+#clustering_start, window_size = int((1460 / 4) * 0), int(1460 / 4) # summer south hemisphere
+clustering_start, window_size = int(0), int(17275) # whole dataset
+#clustering_start, window_size = int((1460 / 4) * 2), int(1460 / 4) # winter south hemisphere
+
+
 results_directory = "results/clustering/" + ds_name + str(clustering_region) + \
-                    cur_time + "/"
+                    "-start=" + str(clustering_start)  + "-wsize=" + \
+                    str(window_size) + '-' + cur_time + "/"
 
 #clustering_time   = ('2014-01-01', '2014-06-30')
 #clustering_time   = ('2014-07-01', '2014-12-31')
-clustering_time = (-1, -1) # if the whole period, uncomment
 
 
 if __name__ == '__main__':
@@ -28,11 +40,7 @@ if __name__ == '__main__':
     ds_manager = DatasetManager(config_manager.get_config_value("dataset_path"))
 
     # Filter Time
-    if clustering_time != (-1, -1):
-        ds_manager.loadDataset(ds_attribute=config_manager.get_config_value("target_attribute"),
-                                start=clustering_time[0], end=clustering_time[1])
-    else:
-        ds_manager.loadDataset(ds_attribute=config_manager.get_config_value("target_attribute"))
+    ds_manager.loadDataset(ds_attribute=config_manager.get_config_value("target_attribute"))
 
     # Filter Region
     if clustering_region != (-1, -1):
@@ -40,10 +48,9 @@ if __name__ == '__main__':
 
     # ******************** FIRST TEST: PERFORM GLOBAL CLUSTERING **************
     start = time()
-    ds = ds_manager.read_all_data()
-
-    # summer south hemisphere
-    #ds = ds_manager.read_window(int( (1460/4) * 2), int(1460/4))
+    #ds = ds_manager.read_all_data() # All dataset
+    ds = ds_manager.read_window(clustering_start, window_size)
+    ds = np.nan_to_num(ds, nan=0, posinf=0, neginf=0)
 
     shp = ds.shape
     gld_list, global_clustering, global_silhouette = ct.cluster_dataset(ds, embedding_method=embedding_method,
