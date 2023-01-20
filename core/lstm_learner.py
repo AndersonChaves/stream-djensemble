@@ -23,7 +23,7 @@ class LstmLearner(UnidimensionalLearner):
         super().__init__(model_directory, model_name,
                           is_temporal_model=is_temporal_model, auto_loading=auto_loading)
         self.update_training_options()
-        self.update_arquitecture()
+        self.update_architecture()
 
     def update_training_options(self, differentiate=False,
               train_as_stateful=False, scale_data=False):
@@ -32,9 +32,12 @@ class LstmLearner(UnidimensionalLearner):
         self.scale_data        = scale_data
         self.scaler            = None
 
-    def update_arquitecture(self, neurons=32, nb_epochs=100):
+    def update_architecture(self, neurons=32, nb_epochs=100,
+                            batch_size=1, number_of_hidden_layers=1):
         self.neurons   = neurons
         self.nb_epochs = nb_epochs
+        self.batch_size = batch_size
+        self.number_of_hidden_layers = number_of_hidden_layers
 
     def train(self, training_series, series_size):
         self.series_size = series_size
@@ -46,8 +49,9 @@ class LstmLearner(UnidimensionalLearner):
             train_scaled, scaler = supervised_values, None
 
         # fit the model
-        lstm_model = mt.fit_lstm(train_scaled, batch_size=1, nb_epoch=self.nb_epochs,
-                              neurons=self.neurons, is_stateful=self.train_as_stateful)
+        lstm_model = mt.fit_lstm(train_scaled, batch_size=self.batch_size, nb_epoch=self.nb_epochs,
+                              neurons=self.neurons, is_stateful=self.train_as_stateful,
+                                 number_of_hidden_layers=self.number_of_hidden_layers)
 
         if self.train_as_stateful:
             train_reshaped = train_scaled[:, 0].reshape(len(train_scaled), 1, 1)

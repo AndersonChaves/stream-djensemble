@@ -27,13 +27,15 @@ train = filtered_dataset.isel(lat=0, lon=0)
 test  = filtered_dataset.isel(lat=0, lon=0)
 
 if retrain_model:
-  lstm_model = LstmLearner("", model_name, auto_loading=False)
+  lstm_model = LstmLearner("", models_dir + model_name, auto_loading=False)
+  lstm_model.update_architecture(neurons=32, nb_epochs=100,
+                                 batch_size=1, number_of_hidden_layers=2)
   np_train = train[ds_variable].to_numpy()
   lstm_model.train(np_train, series_size)
   np.save(models_dir + model_name + ".npy", np_train)
   model_training.save_model_as_h5(lstm_model.get_model(), models_dir + model_name)
 else:
-  lstm_model = LstmLearner("", model_name, auto_loading=True)
+  lstm_model = LstmLearner("", models_dir + model_name, auto_loading=True)
 
 supervised_test = model_training.transform_supervised(test[ds_variable].to_numpy(), series_size)
 results = lstm_model.predict(lstm_model.get_model(), supervised_test)

@@ -54,13 +54,15 @@ def invert_scale(scaler, X, value):
     return inverted[0, -1]
 
 # fit an LSTM network to training data
-def fit_lstm(train, batch_size, nb_epoch, neurons, is_stateful=False):
+def fit_lstm(train, batch_size, nb_epoch, neurons, is_stateful=False,
+             number_of_hidden_layers=1):
     X, y = train[:, 0:-1], train[:, -1]
     X = X.reshape(X.shape[0], X.shape[1], 1)
 
     model = Sequential()
     model.add(layers.Input(shape=(None, 1)))
-    model.add(layers.LSTM(neurons, stateful=is_stateful,  return_sequences=True))
+    for _ in range(number_of_hidden_layers):
+        model.add(layers.LSTM(neurons, stateful=is_stateful,  return_sequences=True))
     model.add(layers.LSTM(neurons, stateful=is_stateful, return_sequences=False))
     model.add(Dense(1))
     model.compile(loss='mean_squared_error', optimizer='adam')
