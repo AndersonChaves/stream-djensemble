@@ -13,16 +13,17 @@ class DatasetManager:
     def loadDataset(self, start = None, end = None, ds_attribute=None):
         data_path = self.data_path
         if not os.path.isfile(data_path):
-            raise("Data Path " + data_path + " is empty.")
+            raise Exception("Data Path " + data_path + " is empty.")
 
         elif data_path[-4:] == '.npy':
             self.ds = np.load(data_path, mmap_mode='c')
             self.accessor = AccessorNumpy()
-
+            #self.ds = np.nan_to_num(self.ds, nan=0, posinf=0, neginf=0)
         elif data_path[-3:] == '.nc':
             self.ds = nc.Dataset(data_path)
             self.ds = np.array(self.ds[ds_attribute])
             self.accessor = AccessorNumpy()
+            #self.ds = np.nan_to_num(self.ds, nan=0, posinf=0, neginf=0)
         else:
             self.ds = xr.load_dataset(data_path).sortby('time')
             self.accessor = AccessorXArray()

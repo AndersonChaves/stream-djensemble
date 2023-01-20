@@ -355,7 +355,8 @@ def perform_tiling(embedding_frame, clustering_frame, method, min_purity_rate):
         start, end = value['start'], value['end']
         tiling_metadata[tile_id]["lat"] = (start[0], end[0])
         tiling_metadata[tile_id]["long"] = (start[1], end[1])
-        tiling_metadata[tile_id]["centroid"] = calculate_centroid(embedding_frame, start, end)
+        if embedding_frame is not None:
+            tiling_metadata[tile_id]["centroid"] = calculate_centroid(embedding_frame, start, end)
     return tiling, tiling_metadata
 
 def save_clustering(clustering):

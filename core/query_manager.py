@@ -72,13 +72,17 @@ class QueryManager():
             self.log("==>Evaluating error for tile " +str(tile_id) + ": " + str(i + 1) + "of " + str(len(ensemble.keys())))
             learner = models_manager.get_model_from_name(model_name)
             tile_metadata = tiling_metadata[tile_id]
-            tile_prediction[tile_id] = self.perform_prediction(data_buffer, learner, tile_metadata)
+            pred = self.perform_prediction(data_buffer, learner, tile_metadata)
+            print("DEBUG: Prediction Len is ", len(pred))
+            tile_prediction[tile_id] = pred
             i += 1
 
         self.log("Recomposing data series")
         query_predicted_series = np.zeros((prediction_length, query_size_lat, query_size_lon))
+        local_clustering = not self.cluster_manager.is_global_clustering()
         for tile_id, value in tile_prediction.items():
-            self.compose_predicted_frame(query_predicted_series, query, tiling_metadata[tile_id], tile_prediction[tile_id])
+            self.compose_predicted_frame(query_predicted_series, query, tiling_metadata[tile_id],
+                                         tile_prediction[tile_id], tiles_relative_to_query=local_clustering)
         self.log("--------------------- Query Executed -------------------------------")
 
         # 7. Recompose data series
@@ -102,12 +106,23 @@ class QueryManager():
         input_dataset = data_window[:, tile_lat[0]: tile_lat[1], tile_long[0]:tile_long[1]]
         return learner.invoke_on_dataset(input_dataset)
 
-    def compose_predicted_frame(self, resulting_array, query, tile_metadata: dict, tile_prediction: np.array):
+    def compose_predicted_frame(self, resulting_array, query, tile_metadata: dict,
+                                tile_prediction: np.array, tiles_relative_to_query):
+
         query_endpoints = query.get_query_endpoints()
-        tile_lat, tile_long = tile_metadata["lat"], tile_metadata["long"]
+        tile_lat = list(tile_metadata["lat"])
+        tile_long = list(tile_metadata["long"])
+        # x1 = query_endpoints[0]
+        # x1_lat, x1_lon =
         query_lat  = query_endpoints[0][0], query_endpoints[1][0]-1#query endpoints are always open interval, so -1
         query_long = query_endpoints[0][1], query_endpoints[1][1]-1 # If change this must change result declaration
 
+        # Transform tile coordinates into absolute coordinates
+        if tiles_relative_to_query:
+            tile_lat[0]  = tile_lat[0] + query_lat[0]
+            tile_lat[1]  = tile_lat[1] + query_lat[0]
+            tile_long[0] = tile_long[0] + query_long[0]
+            tile_long[1] = tile_long[1] + query_long[0]
         # Get from prediction, area corresponding to query
         ##1. Get intersecting coordinates relative to tile
         intersection_lat = max(tile_lat[0] , query_lat[0]), min(tile_lat[1] , query_lat[1])
@@ -116,7 +131,12 @@ class QueryManager():
         ##2. Get data corresponding to coordinates found
         i_lat = intersection_lat[0] - tile_lat[0], intersection_lat[1] - tile_lat[0]
         i_lon = intersection_long[0] - tile_long[0], intersection_long[1] - tile_long[0]
-        intersecting_data = tile_prediction[i_lat[0]:i_lat[1]+1, i_lon[0]:i_lon[1]+1]
+
+        print("DEBUG Compose: shape of tile_prediction is ", tile_prediction.shape)
+        if len(tile_prediction.shape) == 3:
+            intersecting_data = tile_prediction[-1, i_lat[0]:i_lat[1] + 1, i_lon[0]:i_lon[1] + 1]
+        else:
+            intersecting_data = tile_prediction[i_lat[0]:i_lat[1]+1, i_lon[0]:i_lon[1]+1]
 
         ##3. Get intersecting coordinates corresponding to query
         lat = intersection_lat[0] - query_lat[0], intersection_lat[1] - query_lat[0]

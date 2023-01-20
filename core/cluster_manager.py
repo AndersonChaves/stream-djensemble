@@ -41,15 +41,18 @@ class ClusterManager():
         if embeddings_list is None:
             embeddings_list = ct.get_embedded_series_representation(update_dataset, method=self.embedding_method)
             ct.normalize_embedding_list(embeddings_list)
-            self.global_series_embedding = embeddings_list
+        self.global_series_embedding = embeddings_list
+        new_emb_shape = update_dataset.shape[1:] +  tuple([embeddings_list.shape[-1]])
         self.clustering = self.cluster_embeddings_using_birch(self.global_series_embedding)
+        self.clustering = np.reshape(self.clustering, newshape=new_emb_shape[:-1])
+        self.global_series_embedding = np.reshape(embeddings_list, newshape=new_emb_shape)
 
-        self.log("--GLOBAL CLUSTERING--Updated global clustering, method" + self.embedding_method + \
-                 str(time.time() - start_update_clustering))
+        self.log("--GLOBAL CLUSTERING--Updated global clustering, method " + self.embedding_method + \
+                 ': ' + str(time.time() - start_update_clustering))
 
-    def cluster_embeddings_using_birch(self, gld_list: np.array):
-        self.birch = self.birch.partial_fit(gld_list)
-        clustering = self.birch.predict(gld_list)
+    def cluster_embeddings_using_birch(self, emb_list: np.array):
+        self.birch = self.birch.partial_fit(emb_list)
+        clustering = self.birch.predict(emb_list)
         return clustering
 
     def perform_global_static_clustering(self, data_frame_series: np.array):

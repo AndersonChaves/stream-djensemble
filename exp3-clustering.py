@@ -7,7 +7,7 @@ import core.view as view
 from time import time
 import numpy as np
 
-config_manager = ConfigManager("clustering.config")
+config_manager = ConfigManager("experiment-metadata/exp3-clustering-rain-radar-france.config")
 embedding_method = config_manager.get_config_value("embedding_method")
 cur_time = str(datetime.now())
 ds_name = config_manager.get_config_value("ds_name")
@@ -40,10 +40,10 @@ if __name__ == '__main__':
 
     # ******************** FIRST TEST: PERFORM GLOBAL CLUSTERING **************
     start = time()
-    # ds = ds_manager.read_all_data()
+    ds = ds_manager.read_all_data()
 
     # summer south hemisphere
-    ds = ds_manager.read_window(int( (1460/4) * 2), int(1460/4))
+    #ds = ds_manager.read_window(int( (1460/4) * 2), int(1460/4))
 
     shp = ds.shape
     gld_list, global_clustering, global_silhouette = ct.cluster_dataset(ds, embedding_method=embedding_method,
