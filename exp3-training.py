@@ -8,10 +8,12 @@ retrain_model = True
 series_size = 10
 
 ds_dir = "datasets/"
+ds_variable = 'TMP_L100'
 #ds_name = "curated.chuva.alertario-malha.2020.nc" # Rio - Pluviométricos
 ds_name = "CFSR-2014.nc" # CFSR - Temperature
 
-model_name = ds_name + "-1x1"
+x0, x1 = (53, 1), (53, 1)
+model_name = ds_name + '-x0=' + str(x0) + "-1x1"
 models_dir = "results/models-trained/"
 # date-time parsing function for loading the dataset
 def parser(x):
@@ -26,12 +28,12 @@ test  = filtered_dataset.isel(lat=0, lon=0)
 
 if retrain_model:
   lstm_model = LstmLearner("", model_name, auto_loading=False)
-  np_train = train['TMP_L100'].to_numpy()
+  np_train = train[ds_variable].to_numpy()
   lstm_model.train(np_train, series_size)
   np.save(models_dir + model_name + ".npy", np_train)
   model_training.save_model_as_h5(lstm_model.get_model(), models_dir + model_name)
 else:
   lstm_model = LstmLearner("", model_name, auto_loading=True)
 
-supervised_test = model_training.transform_supervised(test['rain'].to_numpy(), series_size)
+supervised_test = model_training.transform_supervised(test[ds_variable].to_numpy(), series_size)
 results = lstm_model.predict(lstm_model.get_model(), supervised_test)
