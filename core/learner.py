@@ -19,12 +19,13 @@ class Learner(ABC):
     temporal_length = 10
 
     def __init__(self, model_directory, model_name,
-                 is_temporal_model=False):
+                 is_temporal_model=False, auto_loading=True):
         self.model_directory = model_directory
         self.model_name = model_name
         self.number_of_training_samples = 10
         self._is_temporal_model = is_temporal_model
-        self.load_model(model_directory, model_name)
+        if auto_loading:
+            self.load_model(model_directory, model_name)
         super().__init__()
 
     def load_model(self, model_directory, model_name):
@@ -121,7 +122,7 @@ class Learner(ABC):
 
     def update_eef(self, noise_level_for_cef):
         print("Updating EEF - Model " + self.model_name)
-        reference_dataset = self.get_reference_dataset()
+        reference_dataset = self.get_reference_dataset() # Change to [:50] if debug
         noise_dataset = reference_dataset.copy()
 
         # Measures model performance
