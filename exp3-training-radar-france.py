@@ -46,9 +46,9 @@ def parser(x):
 ds = np.load(ds_dir + ds_name)
 
 filtered_dataset = ds[period[0]:period[1]]
-filtered_dataset = filtered_dataset[x0[0]: x1[0]+1, x0[1]: x1[1]+1]
+filtered_dataset = filtered_dataset[:, x0[0]: x1[0]+1, x0[1]: x1[1]+1]
 shp = filtered_dataset.shape
-filtered_dataset = np.reshape(filtered_dataset, newshape=(shp[2], 1))
+filtered_dataset = np.reshape(filtered_dataset, newshape=(shp[0], 1))
 
 train = filtered_dataset
 test  = filtered_dataset
@@ -56,7 +56,7 @@ test  = filtered_dataset
 if retrain_model:
   lstm_model = LstmLearner("", models_dir + model_name, auto_loading=False)
   lstm_model.update_architecture(neurons=32, nb_epochs=100,
-                                 batch_size=1, number_of_hidden_layers=2)
+                                 batch_size=100, number_of_hidden_layers=2)
 
   lstm_model.train(train, series_size)
   np.save(models_dir + model_name + ".npy", train)
