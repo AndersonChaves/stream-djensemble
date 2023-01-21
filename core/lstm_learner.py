@@ -95,5 +95,5 @@ class LstmLearner(UnidimensionalLearner):
         pyplot.show()
         fig.savefig(self.model_directory + self.model_name + '.png', dpi=40)
         file = self.model_directory + self.model_name + '.txt'
-        with open(file) as f:
+        with open(file, "w") as f:
             f.write('Test RMSE: %.3f' % rmse)
