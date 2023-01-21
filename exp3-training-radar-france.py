@@ -44,7 +44,7 @@ def parser(x):
 
 # load dataset
 ds = np.load(ds_dir + ds_name)
-
+ds = np.nan_to_num(ds, nan=0, posinf=0, neginf=0)
 filtered_dataset = ds[period[0]:period[1]]
 filtered_dataset = filtered_dataset[:, x0[0]: x1[0]+1, x0[1]: x1[1]+1]
 shp = filtered_dataset.shape
