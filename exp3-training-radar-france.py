@@ -46,7 +46,7 @@ def parser(x):
 ds = np.load(ds_dir + ds_name)
 
 filtered_dataset = ds[period[0]:period[1]]
-filtered_dataset = filtered_dataset[x0[0]: x1[0], x0[1]: x1[1]]
+filtered_dataset = filtered_dataset[x0[0]: x1[0]+1, x0[1]: x1[1]+1]
 
 train = filtered_dataset
 test  = filtered_dataset
