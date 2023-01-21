@@ -12,8 +12,22 @@ ds_variable = 'TMP_L100'
 #ds_name = "curated.chuva.alertario-malha.2020.nc" # Rio - Pluviométricos
 ds_name = "CFSR-2014.nc" # CFSR - Temperature
 
-x0, x1 = (53, 1), (53, 1)
-model_name = ds_name + '-x0=' + str(x0) + "-1x1"
+summer = '2014-01-01 00:00:00', '2014-03-30 23:45:00'
+winter = '2014-07-01 00:00:00', '2014-09-31 23:45:00'
+
+p = "summer"
+if p == "summer":
+  period = summer
+else:
+  period = winter
+
+#Models 1x1 - CFSR
+#x0, x1 = (53, 1), (53, 1) #C0
+#x0, x1 = (1, 1), (1, 1) #C1
+#x0, x1 = (113, 28), (113, 28) #C2
+
+model_name = ds_name + '-x0=' + str(x0) + "-1x1" + "-" + p
+
 models_dir = "results/models-trained/"
 # date-time parsing function for loading the dataset
 def parser(x):
@@ -22,7 +36,7 @@ def parser(x):
 # load dataset
 ds = xr.open_dataset(ds_dir + ds_name)
 
-filtered_dataset = ds.sel(time=slice('2014-01-01 00:00:00', '2014-03-30 23:45:00'), drop=True)
+filtered_dataset = ds.sel(time=slice(*period), drop=True)
 train = filtered_dataset.isel(lat=0, lon=0)
 test  = filtered_dataset.isel(lat=0, lon=0)
 
