@@ -10,6 +10,7 @@ from keras.layers import LSTM
 from math import sqrt
 from matplotlib import pyplot
 import numpy
+import core.view as view
 
 from core.learner import UnidimensionalLearner
 import core.model_training as mt
@@ -84,7 +85,15 @@ class LstmLearner(UnidimensionalLearner):
             # report performance
         rmse = sqrt(mean_squared_error(testing_series[len_series:, -1], predictions))
         print('Test RMSE: %.3f' % rmse)
+
+
+
         # line plot of observed vs predicted
+        fig, ax = pyplot.subplots()
         pyplot.plot(testing_series[len_series:, -1])
         pyplot.plot(predictions)
         pyplot.show()
+        fig.savefig(self.model_directory + self.model_name + '.png', dpi=40)
+        file = self.model_directory + self.model_name + '.txt'
+        with open(file) as f:
+            f.write('Test RMSE: %.3f' % rmse)
