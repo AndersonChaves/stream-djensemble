@@ -22,7 +22,7 @@ else:
   period = winter
 
 #Models 1x1 - CFSR
-#x0, x1 = (53, 1), (53, 1) #C0
+x0, x1 = (53, 1), (53, 1) #C0
 #x0, x1 = (1, 1), (1, 1) #C1
 #x0, x1 = (113, 28), (113, 28) #C2
 
@@ -37,13 +37,13 @@ def parser(x):
 ds = xr.open_dataset(ds_dir + ds_name)
 
 filtered_dataset = ds.sel(time=slice(*period), drop=True)
-train = filtered_dataset.isel(lat=0, lon=0)
-test  = filtered_dataset.isel(lat=0, lon=0)
+train = filtered_dataset.isel(lat=x0[0], lon=x0[1])
+test  = filtered_dataset.isel(lat=x0[0], lon=x0[1])
 
 if retrain_model:
   lstm_model = LstmLearner("", models_dir + model_name, auto_loading=False)
   lstm_model.update_architecture(neurons=32, nb_epochs=100,
-                                 batch_size=1, number_of_hidden_layers=2)
+                                 batch_size=100, number_of_hidden_layers=2)
   np_train = train[ds_variable].to_numpy()
   lstm_model.train(np_train, series_size)
   np.save(models_dir + model_name + ".npy", np_train)
