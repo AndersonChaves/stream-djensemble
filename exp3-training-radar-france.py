@@ -4,7 +4,7 @@ from pandas import datetime
 from core.lstm_learner import LstmLearner
 import numpy as np
 
-retrain_model = True
+retrain_model = False
 series_size = 10
 
 ds_dir = "datasets/"
@@ -16,14 +16,17 @@ ds_name = "radar-2016-0to17275.npy" # RFRANCE - Rain
 #summer = '2014-01-01 00:00:00', '2014-03-30 23:45:00'
 #winter = '2014-07-01 00:00:00', '2014-09-31 23:45:00'
 
-winter = (0, 17276//4)
-summer = (17276//4 *2, 17276)
-
+winter_training = (0, 17276 // 4)
+winter_testing = ((17276 // 4) * 1, (17276 // 4) *2)
+summer_training = ((17276 // 4) * 2, (17276 // 4) * 3)
+summer_testing = (17276 // 4 * 3, 17276)
 p = "summer"
 if p == "summer":
-  period = summer
+  p_training = summer_training
+  p_testing = summer_testing
 else:
-  period = winter
+  p_training = winter_training
+  p_testing = winter_testing
 
 #Models 1x1 - CFSR
 #x0, x1 = (53, 1), (53, 1) #C0
@@ -43,15 +46,18 @@ def parser(x):
   return datetime.strptime('190'+x, '%Y-%m')
 
 # load dataset
-ds = np.load(ds_dir + ds_name)
-ds = np.nan_to_num(ds, nan=0, posinf=0, neginf=0)
-filtered_dataset = ds[period[0]:period[1]]
-filtered_dataset = filtered_dataset[:, x0[0]: x1[0]+1, x0[1]: x1[1]+1]
-shp = filtered_dataset.shape
-filtered_dataset = np.reshape(filtered_dataset, newshape=(shp[0], 1))
 
-train = filtered_dataset
-test  = filtered_dataset
+def load_dataset(ds_dir, ds_name, period, x0, x1):
+  ds = np.load(ds_dir + ds_name)
+  ds = np.nan_to_num(ds, nan=0, posinf=0, neginf=0)
+  filtered_dataset = ds[period[0]:period[1]]
+  filtered_dataset = filtered_dataset[:, x0[0]: x1[0]+1, x0[1]: x1[1]+1]
+  shp = filtered_dataset.shape
+  filtered_dataset = np.reshape(filtered_dataset, newshape=(shp[0], 1))
+  return filtered_dataset
+
+train = load_dataset(ds_dir, ds_name, p_training, x0, x1)
+test  = load_dataset(ds_dir, ds_name, p_testing, x0, x1)
 
 if retrain_model:
   lstm_model = LstmLearner("", models_dir + model_name, auto_loading=False)
