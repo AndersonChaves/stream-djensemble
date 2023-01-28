@@ -22,5 +22,5 @@ def run_from_file(global_configurations_path, cfg_number, results_file_name):
       djensemble.log("**************Experiment end. Start Time:" + str(cur_time) + "**************")
 
 if __name__ == '__main__':
-    run_from_file(global_configurations_path_config_1, 1, "results-cfg1.out")
-    run_from_file(global_configurations_path_config_1, 2, "results-cfg2.out")
+    #run_from_file(global_configurations_path_config_1, 1, "results-cfg1.out")
+    run_from_file(global_configurations_path_config_2, 2, "results-cfg2.out")
