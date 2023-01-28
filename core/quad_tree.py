@@ -19,7 +19,8 @@ class QuadTree:
     def is_partitionable(self):
         if (self.calculate_purity() < self.min_purity) and \
            (self.cur_depth+1 <= self.max_depth) and \
-           (len(self.data) > 0):
+           (len(self.data) >= 2) and \
+           (len(self.data[0]) >= 2):
             return True
         else:
             return False
@@ -41,6 +42,10 @@ class QuadTree:
         return quad
 
     def calculate_purity(self):
+        if len(self.data) == 0 or len(self.data[0]):
+            return 1
+        print("Calculating puriity: ", self.data.shape)
+        print("Calculating puriity: ", self.data)
         b_count = np.bincount(self.data.flatten())
         highest_frequency = b_count[b_count.argmax()]
         purity = highest_frequency / self.data.size
