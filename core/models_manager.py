@@ -56,7 +56,7 @@ class ModelsManager():
     def get_names_of_models_in_dir(self, models_path):
         models = fnmatch.filter(os.listdir(models_path), '*.h5')
         for i, m in enumerate(models):
-            models[i] = m.split('.')[0]
+            models[i] = m.split('.h5')[0]
         return models
 
     def get_latitude_input_size(self, model_name):

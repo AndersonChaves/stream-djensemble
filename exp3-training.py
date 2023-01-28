@@ -70,10 +70,19 @@ else:
 #x0, x1 = (30, 67), (30, 67) #C2
 
 #Models 3x3 - RFRANCE
-x0, x1 = (56, 61), (58, 63)
-#(112, 10) a (114, 12)
-#(31, 68) a (33, 70)
+#x0, x1 = (56, 61), (58, 63)
+#x0, x1 = (112, 10), (114, 12)
+#x0, x1 = (31, 68), (33, 70)
 
+#Models 5x5 - RFRANCE
+#x0, x1 = (56, 60), (60, 64)
+#x0, x1 = (114, 12), (118, 16)
+#x0, x1 = (32, 69), (36, 73)
+
+#Models 7x7 - RFRANCE
+x0, x1 = (55, 62), (61, 68)
+#x0, x1 = (116, 11), (122, 17)
+#x0, x1 = (33, 70), (39, 76)
 
 
 lts, lns = x1[0] - x0[0]+1, x1[1] - x0[1]+1
@@ -90,11 +99,11 @@ def parser(x):
 
 def load_dataset_rfrance(ds_dir, ds_name, period, x0, x1):
   ds = np.load(ds_dir + ds_name)
-  ds = np.nan_to_num(ds, nan=0, posinf=0, neginf=0)
   filtered_dataset = ds[period[0]:period[1]]
   filtered_dataset = filtered_dataset[:, x0[0]: x1[0]+1, x0[1]: x1[1]+1]
-  shp = filtered_dataset.shape
-  filtered_dataset = np.reshape(filtered_dataset, newshape=(shp[0], 1))
+  filtered_dataset = np.nan_to_num(filtered_dataset, nan=0, posinf=0, neginf=0)
+  #shp = filtered_dataset.shape
+  #filtered_dataset = np.reshape(filtered_dataset, newshape=(shp[0], 1))
   return filtered_dataset
 
 def load_dataset_cfsr(ds_dir, ds_name, period, x0, x1):
@@ -103,13 +112,6 @@ def load_dataset_cfsr(ds_dir, ds_name, period, x0, x1):
   filtered_dataset = filtered_dataset.isel(lat=slice(x0[0], x1[0]+1), lon=slice(x0[1], x1[1]+1))
   np_ds = filtered_dataset["TMP_L100"].to_numpy()
   return np_ds
-
-if ds_name == "CFSR-2014.nc":
-  train = load_dataset_cfsr(ds_dir, ds_name, p_training, x0, x1)
-  test = load_dataset_cfsr(ds_dir, ds_name, p_testing, x0, x1)
-else:
-  train = load_dataset_rfrance(ds_dir, ds_name, p_training, x0, x1)
-  test  = load_dataset_rfrance(ds_dir, ds_name, p_testing, x0, x1)
 
 def train_test_lstm():
   if retrain_model:
@@ -139,6 +141,13 @@ def train_test_conv_lstm():
   return conv_lstm_model
 
 
+if ds_name == "CFSR-2014.nc":
+  train = load_dataset_cfsr(ds_dir, ds_name, p_training, x0, x1)
+  test = load_dataset_cfsr(ds_dir, ds_name, p_testing, x0, x1)
+else:
+  train = load_dataset_rfrance(ds_dir, ds_name, p_training, x0, x1)
+  test  = load_dataset_rfrance(ds_dir, ds_name, p_testing, x0, x1)
+
 #supervised_test = model_training.transform_supervised(test, series_size)
 #supervised_test = model_training.build_dataset(test, series_size)
 
@@ -148,6 +157,14 @@ if model_type == "lstm":
 else:
   model = train_test_conv_lstm()
   x_train, x_val, y_train, y_val, train_dataset, val_dataset = model_training.conv_transform_supervised(test, series_size)
+
+  #x_train = [x for i, x in enumerate(x_train) if i % 10 == 0]
+  #y_train = [x for i, x in enumerate(y_train) if i % 10 == 0]
+
+  x_train = x_train[range(0, len(x_train), 1)]
+  y_train = y_train[range(0, len(y_train), 1)]
+
   supervised_test = [x_train, y_train]
+
 
 results = model.predict(model.get_model(), supervised_test)

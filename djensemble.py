@@ -82,11 +82,19 @@ class DJEnsemble:
             static_clusterization_range = eval(self.config_manager.get_config_value("static_clusterization_range"))
             self.log("Performing Global Clustering and Tiling: Frame" + str(0) + " to " + str(static_clusterization_range))
             self.start_global_clustering = time.time()
-            self.cluster_manager.perform_global_static_clustering(self.dataset_manager.read_window(0, static_clusterization_range))
+            # PERFORM STATIC CLUSTERING - GLOBAL
+            if self.config_manager.get_config_value("clusterization_mode") == 'static':
+                self.cluster_manager.perform_global_static_clustering(self.dataset_manager.read_window(0, static_clusterization_range))
+                self.cluster_manager.perform_global_static_tiling(
+                    self.dataset_manager.read_window(0, static_clusterization_range))
+                self.log("Global Clustering and Tiling Performed, total time: " + str(
+                    time.time() - self.start_global_clustering))
+                self.log("Number of Tiles: " + str(self.cluster_manager.get_current_number_of_tiles()))
+            else:
+                # PERFORM STATIC CLUSTERING - LOCAL
+                print("Error: Local static clustering not yet implemented")
+                raise(Exception("Error: Local static clustering not yet implemented"))
 
-            self.cluster_manager.perform_global_static_tiling(
-                self.dataset_manager.read_window(0, static_clusterization_range))
-            self.log("Global Clustering and Tiling Performed, total time: " + str(time.time() - self.start_global_clustering))
 
         self.initialized = True
         self.log("End of offline stage, total time: " + str(time.time() - self.start_cef))

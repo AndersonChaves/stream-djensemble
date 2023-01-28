@@ -122,7 +122,7 @@ class Learner(ABC):
 
     def update_eef(self, noise_level_for_cef):
         print("Updating EEF - Model " + self.model_name)
-        reference_dataset = self.get_reference_dataset() # Change to [:50] if debug
+        reference_dataset = self.get_reference_dataset()[:20] # Change to [:50] if debug
         noise_dataset = reference_dataset.copy()
 
         # Measures model performance
@@ -168,9 +168,13 @@ class UnidimensionalLearner(Learner):
     def invoke_on_dataset(self, target_dataset):
         time, lat, long = target_dataset.shape
         output = np.empty((time, lat, long))
+
         for i in range(lat):
             for j in range(long):
-                output[:, i, j] = self.invoke(target_dataset[:, i, j])
+                input = target_dataset[:, i, j]
+                input = np.reshape(input, (10, 1))
+                out = self.invoke(input)
+                output[:, i, j] = np.reshape(out, (10))
         return output
 
 class MultidimensionalLearner(Learner):

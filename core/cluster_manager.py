@@ -90,6 +90,9 @@ class ClusterManager():
             self.tiling_is_updated = True
         return self.tiling_metadata
 
+    def get_current_number_of_tiles(self):
+        return len(self.get_tiling_metadata().keys())
+
     def clusters_from_series(self, data_series: np.array):
         gld_list = ct.get_gld_series_representation_from_dataset(data_series)
         ct.normalize_embedding_list(gld_list)
