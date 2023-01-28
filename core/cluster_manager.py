@@ -36,6 +36,9 @@ class ClusterManager():
             self.log("--CLUSTERING--Updated local clustering: query" + str(query_id) + ":" + \
               str(time.time() - start_update_clustering))
 
+            self.log("--TILING--Number of tiles: query" + str(query_id) + ":" + \
+                     str(self.get_current_number_of_tiles()))
+
     def update_global_clustering(self, update_dataset: np.array, embeddings_list=None):
         start_update_clustering = time.time()
         if embeddings_list is None:

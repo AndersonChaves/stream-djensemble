@@ -95,6 +95,9 @@ class ContinuousQuery(ConfigManager):
         self.config_parameters["Error History"] = str(self.rmse_history)
         self.config_parameters["Average RMSE"] = str(sum(self.rmse_history) / len(self.rmse_history))
 
+    def get_current_number_of_tiles(self):
+        return len(self.get_tiling_metadata().keys())
+
     def get_error_history(self, type="rmse"):
         if type == "rmse":
             return self.rmse_history
