@@ -3,7 +3,7 @@ import tensorflow as tf
 from tensorflow.keras.models import model_from_json
 from functools import reduce
 import dtw
-
+import core.utils as ut
 from .noise_generator import NoiseGenerator
 from .series_generator import SeriesGenerator
 from .simple_regressor import LinearRegressor
@@ -78,10 +78,6 @@ class Learner(ABC):
         return self.reference_dataset
 
     def get_reference_dataset_mock(self):
-        #1. Get the learner's spatial coordinates
-        #2. Obtain the reference dataset from stream (e.g. directly from kafka)
-        # - Use data aggregator? Another Class? Where does DJEnsemble access the stream from?
-        #todo - Swap Mock
         dataset_mock = np.full((100, 10, 10), 10.0)
         return dataset_mock
 
@@ -120,21 +116,37 @@ class Learner(ABC):
         #    self.centroid = self.calculate_centroid_coordinate(self.get_reference_dataset())
         #return self.centroid
 
-    def update_eef(self, noise_level_for_cef):
-        print("Updating EEF - Model " + self.model_name)
-        reference_dataset = self.get_reference_dataset()[:20] # Change to [:50] if debug
+    def update_cef(self, noise_level_for_cef, update_models_cef=True):
+        print("Updating CEF - Model " + self.model_name)
+        reference_dataset = self.get_reference_dataset()#[:20] # Change to [:50] if debug
         noise_dataset = reference_dataset.copy()
+        parameters_file = self.model_directory + \
+                          self.model_name + \
+                          "-noise_level-" + str(noise_level_for_cef) \
+                                  + ".parameters"
 
-        # Measures model performance
-        distances = []
-        error = []
-        centroid = self.get_reference_dataset_centroid_coordinate()
-        for i in range(noise_level_for_cef):
-            print("Evaluating model", self.model_name, " on noise dataset ", i)
-            error.append(self.evaluate(noise_dataset))
-            distances.append(self.compare_dataset_distances(reference_dataset, noise_dataset,
-                                                                centroid, centroid))
-            NoiseGenerator().add_noise(noise_dataset)
+        if update_models_cef or not ut.file_exists(parameters_file):
+
+            # Measures model performance
+            distances = []
+            error = []
+            centroid = self.get_reference_dataset_centroid_coordinate()
+            for i in range(noise_level_for_cef):
+                print("Evaluating model", self.model_name, " on noise dataset ", i)
+                error.append(self.evaluate(noise_dataset))
+                distances.append(self.compare_dataset_distances(reference_dataset, noise_dataset,
+                                                                    centroid, centroid))
+                NoiseGenerator().add_noise(noise_dataset)
+            with open(parameters_file, "w") as f:
+                f.write("distances #" + str(distances) + "\n")
+                f.write("error #" + str(error) + "\n")
+        else:
+            with open(parameters_file) as f:
+                distances = f.readline().split("#")[1] #[:-1]
+                error = f.readline().split("#")[1] #[:-1]
+                distances = eval(distances.strip())
+                error = eval(error.strip())
+
 
         # Fit line
         r = LinearRegressor(distances, error)
@@ -193,14 +205,14 @@ def test_unidimensional_layer():
     directory = "/home/anderson/Dropbox/Doutorado/Tese/Fermatta/DJEnsemble/models/rain/temporal/"
     name = "best_model_C4"
     l = UnidimensionalLearner(directory, name, is_temporal_model=True)
-    l.update_eef(1)
+    l.update_cef(1)
     print(l.execute_eef(NoiseGenerator().add_noise(l.get_reference_dataset()), (0, 0)) )
 
 def test_multidimensional_layer():
     directory = "/home/anderson/Dropbox/Doutorado/Tese/Fermatta/DJEnsemble/models/rain/convolutional/"
     name = "best_DJ1_v1_upd"
     l = MultidimensionalLearner(directory, name, is_temporal_model=False)
-    l.update_eef(1)
+    l.update_cef(1)
     print(l.execute_eef(NoiseGenerator().add_noise(l.get_reference_dataset())))
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import os
+from os.path import exists
 
 def create_directory_if_not_exists(path):
     if not os.path.exists(path):
@@ -17,3 +18,6 @@ def list_all_files_in_dir(path, extension=''):
         if file.endswith(extension) or file.endswith('.' + extension):
             res.append(file)
     return(res)
+
+def file_exists(path_to_file):
+    return exists(path_to_file)

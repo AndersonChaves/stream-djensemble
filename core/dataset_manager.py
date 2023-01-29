@@ -21,7 +21,7 @@ class DatasetManager:
             #self.ds = np.nan_to_num(self.ds, nan=0, posinf=0, neginf=0)
         elif data_path[-3:] == '.nc':
             self.ds = nc.Dataset(data_path)
-            self.ds = np.array(self.ds[ds_attribute])
+            self.ds = np.array(self.ds[ds_attribute])#[:100])
             self.accessor = AccessorNumpy()
             #self.ds = np.nan_to_num(self.ds, nan=0, posinf=0, neginf=0)
         else:

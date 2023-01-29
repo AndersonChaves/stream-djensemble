@@ -10,6 +10,7 @@ class ModelsManager():
     def __init__(self, config_manager):
         self.conv_models_path = config_manager.get_config_value("convolutional_models_path")
         self.temp_models_path = config_manager.get_config_value("temporal_models_path")
+        self.update_models_cef = config_manager.get_config_value("update_models_cef") == 's'
         self.include_convolutional_models_from_directory(self.conv_models_path)
         self.include_temporal_models_from_directory(self.temp_models_path)
         self.load_models()
@@ -104,7 +105,7 @@ class ModelsManager():
 
     def update_cef(self, noise_level_for_cef):
         for learner in self.get_models():
-            learner.update_eef(noise_level_for_cef)
+            learner.update_cef(noise_level_for_cef, update_models_cef=self.update_models_cef)
 
 if __name__ == "__main__":
     print("Teste")

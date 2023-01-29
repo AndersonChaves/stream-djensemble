@@ -1,6 +1,7 @@
 from sklearn.cluster import Birch
 import core.categorization as ct
 import numpy as np
+import core.utils as ut
 from .config_manager import ConfigManager
 from .query_manager import QueryManager
 from .series_generator import SeriesGenerator
@@ -13,6 +14,8 @@ class ClusterManager():
             self.notifier_list = notifier_list
         self.config_manager = config_manager
         self.clustering_algorithm = config_manager.get_config_value("clustering_algorithm")
+        self.load_global_clustering_from_file = config_manager.get_config_value(
+            "load_global_clustering_from_file") == 's'
         self.embedding_method = config_manager.get_config_value("global_embedding_method")
         self.clustering_behavior = self.config_manager.get_config_value("series_clustering_behavior")
         self.tiling_metadata = {}
@@ -37,7 +40,7 @@ class ClusterManager():
               str(time.time() - start_update_clustering))
 
             self.log("--TILING--Number of tiles: query" + str(query_id) + ":" + \
-                     str(self.get_current_number_of_tiles()))
+                     str(continuous_query.get_current_number_of_tiles()))
 
     def update_global_clustering(self, update_dataset: np.array, embeddings_list=None):
         start_update_clustering = time.time()
@@ -59,6 +62,10 @@ class ClusterManager():
         return clustering
 
     def perform_global_static_clustering(self, data_frame_series: np.array):
+        #clustering_file_name = ut.get_file_name_from_path(config_manager.get_config_value(
+        #    "dataset_path"))
+        #if self.load_global_clustering_from_file and ut.file_exists(clustering_file_name)
+
         self.log("Start static clusterization")
         start_initialize_clustering = time.time()
         self.global_series_embedding, self.clustering, self.best_silhouette = ct.cluster_dataset(data_frame_series, self.embedding_method)

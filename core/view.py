@@ -21,10 +21,12 @@ def print_array_screen(array_list, title_list = None, cmap_list=None):
     plt.show()
 
 def save_figure_from_matrix(matrix : np.array, title: str,
-                              parent_directory='', write_values=False):
+                              parent_directory='', write_values=False,
+                            font_size=15):
 
     matplotlib.use('TkAgg')
-    #matplotlib.rcParams.update({'font.size': 15})
+    if write_values:
+        matplotlib.rcParams.update({'font.size': font_size})
     fig, ax = plt.subplots()
     ax.matshow(matrix, cmap=plt.cm.Blues)
 
@@ -36,7 +38,7 @@ def save_figure_from_matrix(matrix : np.array, title: str,
                 # print("I, J: ", i, ' ', j)
 
     fig.tight_layout()
-    fig.savefig(parent_directory + title + '.png', dpi=140)
+    fig.savefig(parent_directory + title + '.png', dpi=160)
     #plt.pause(1)
     plt.close("all")
 
@@ -47,7 +49,7 @@ def plot_graph_line(error_history, title: str,
     fig, ax = plt.subplots()
     print("Error History: ", error_history)
     ax.plot(list(range(len(error_history))), error_history)
-    fig.savefig(parent_directory + title + '.png', dpi=140)
+    fig.savefig(parent_directory + title + '.png', dpi=160)
 
     #plt.plot(list(range(len(error_history))), error_history)
     #plt.savefig(parent_directory + title + '.png', dpi=40)

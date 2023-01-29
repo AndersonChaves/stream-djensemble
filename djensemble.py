@@ -1,13 +1,10 @@
 import numpy as np
 import time, datetime
-
-import core.categorization as categorization
 from core.config_manager import ConfigManager
 from core.query_manager import QueryManager
 from core.dataset_manager import DatasetManager
 from core.cluster_manager import ClusterManager
 from core.models_manager import ModelsManager
-from core.notifier import TextNotifier
 import core.view
 import core.utils as ut
 
@@ -169,6 +166,12 @@ class DJEnsemble:
             query_next_frame = self.dataset_manager.filter_frame_by_query_region(real_next_frame, x1, x2)
             continuous_query.update_rmse(query_next_frame)
 
+            self.log("Query error updated: " + str(query_id) +
+                     str(continuous_query.config_parameters["Error History"]))
+            self.log("Average RMSE: " + str(query_id) +
+                     str(continuous_query.config_parameters["Average RMSE"]))
+
+
     def set_config_manager(self, config_manager):
         self.config_manager = config_manager
 
@@ -184,8 +187,13 @@ class DJEnsemble:
             clustering = self.cluster_manager.clustering
         else:
             clustering = continuous_query.get_current_clustering()
+        if len(clustering) > 10:
+            f_size = 1
+        else:
+            f_size = 15
         core.view.save_figure_from_matrix(clustering, "clustering",
-                                          parent_directory = self.figures_directory, write_values = True)
+                                          parent_directory = self.figures_directory,
+                                          write_values = True, font_size = f_size)
 
         self.log("Generating visualization: tiling")
         if self.cluster_manager.is_global_clustering():
@@ -194,7 +202,8 @@ class DJEnsemble:
             start_tiling = time.time()
             tiling = continuous_query.get_tiling()
         core.view.save_figure_from_matrix(tiling, "tiling",
-                                          parent_directory=self.figures_directory, write_values=True)
+                                          parent_directory=self.figures_directory,
+                                          write_values=True, font_size = f_size)
 
         self.log("Generating visualization: current frame")
         core.view.save_figure_from_matrix(self.data_buffer[-1],
