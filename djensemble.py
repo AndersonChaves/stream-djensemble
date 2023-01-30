@@ -125,7 +125,8 @@ class DJEnsemble:
                 self.perform_continuous_queries(self.query_manager, self.data_buffer,
                                                 self.models_manager, self.dataset_manager)
                 self.evaluate_error(self.read_record(self.t_current+1), self.query_manager)
-                self.update_window_visualization()
+                if self.t_current % 100 == 0:
+                    self.update_window_visualization()
                 self.data_buffer = np.empty(self.get_buffer_shape())
                 if single_iteration:
                     data_stream_active = False
