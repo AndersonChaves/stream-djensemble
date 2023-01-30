@@ -113,10 +113,10 @@ class DJEnsemble:
             self.data_buffer = np.concatenate((self.data_buffer, np.expand_dims(data_matrix, axis=0)), axis=0)
 
             start_frame_visualization = time.time()
-            self.update_frame_visualization()
             self.log("Time generating visualization: " + str(time.time()-start_frame_visualization))
 
             if len(self.data_buffer) >= window_size:
+                self.update_frame_visualization()
                 if self.config_manager.get_config_value("clusterization_mode") == 'dynamic':
                     start_clusterization = time.time()
                     self.update_clusters_online(self.data_buffer)
