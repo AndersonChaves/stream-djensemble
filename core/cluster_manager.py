@@ -82,7 +82,7 @@ class ClusterManager():
     def save_clustering(self, label):
 
         file_name = ut.get_file_name_from_path(self.config_manager.get_config_value("dataset_path"))
-        file_name += self.embedding_method + label
+        file_name += "-" + self.embedding_method + "-" + label
 
         clustering_file_name = self.clustering_directory + file_name + ".clustering"
         embedding_file_name = self.clustering_directory + file_name + ".embedding"
