@@ -65,8 +65,8 @@ class ClusterManager():
     def try_loading_clustering_from_file(self, label) -> bool:
         file_name = ut.get_file_name_from_path(self.config_manager.get_config_value("dataset_path"))
         file_name += "-" + self.embedding_method + "-" + label
-        clustering_file_name = self.clustering_directory + file_name + ".clustering"
-        embedding_file_name = self.clustering_directory + file_name + ".embedding"
+        clustering_file_name = self.clustering_directory + file_name + ".clustering.npy"
+        embedding_file_name = self.clustering_directory + file_name + ".embedding.npy"
         silhouette_file_name = self.clustering_directory + file_name + ".silhouette"
         self.log("Try Cluster Loading")
         if self.bool_load_global_clustering_from_file and ut.file_exists(clustering_file_name):
