@@ -6,8 +6,10 @@ from core.config_manager import ConfigManager
 
 
 # Global Configurations
-global_configurations_path_config_1 = "experiment-metadata/djensemble-exp3-cfsr-cfg1.config"
-global_configurations_path_config_2 = "experiment-metadata/djensemble-exp3-cfsr-cfg2.config"
+#global_configurations_path_config_1 = "experiment-metadata/djensemble-exp3-cfsr-cfg1.config"
+#global_configurations_path_config_2 = "experiment-metadata/djensemble-exp3-cfsr-cfg2.config"
+global_configurations_path_config_1 = "experiment-metadata/djensemble-exp3-rfrance-cfg1.config"
+global_configurations_path_config_2 = "experiment-metadata/djensemble-exp3-rfrance-cfg2.config"
 
 def run_from_file(global_configurations_path, cfg_number, results_file_name):
     cur_time = str(datetime.now())
