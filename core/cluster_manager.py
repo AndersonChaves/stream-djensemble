@@ -73,7 +73,7 @@ class ClusterManager():
             self.log("Loading Clustering: " + clustering_file_name)
             self.global_series_embedding = np.load(embedding_file_name)
             self.clustering              = np.load(clustering_file_name)
-            with open(silhouette_file_name, "w") as f:
+            with open(silhouette_file_name, "r") as f:
                 self.best_silhouette = eval(f.readline())
             return True
         else:
