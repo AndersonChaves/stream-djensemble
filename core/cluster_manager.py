@@ -14,7 +14,7 @@ class ClusterManager():
             self.notifier_list = notifier_list
         self.config_manager = config_manager
         self.clustering_algorithm = config_manager.get_config_value("clustering_algorithm")
-        self.load_global_clustering_from_file = config_manager.get_config_value(
+        self.bool_load_global_clustering_from_file = config_manager.get_config_value(
             "load_global_clustering_from_file") == 's'
         self.embedding_method = config_manager.get_config_value("global_embedding_method")
         self.clustering_behavior = self.config_manager.get_config_value("series_clustering_behavior")
@@ -23,6 +23,7 @@ class ClusterManager():
             #self.birch = Birch(branching_factor=6, n_clusters=2, threshold=15)
             self.birch = Birch(n_clusters=n_clusters)
         self.tiling_is_updated = False
+        self.clustering_directory = "results/clustering/"
 
     def is_global_clustering(self) -> bool:
         return self.clustering_behavior == 'global'
@@ -61,20 +62,47 @@ class ClusterManager():
         clustering = self.birch.predict(emb_list)
         return clustering
 
-    def perform_global_static_clustering(self, data_frame_series: np.array):
-        #clustering_file_name = ut.get_file_name_from_path(config_manager.get_config_value(
-        #    "dataset_path"))
-        #if self.load_global_clustering_from_file and ut.file_exists(clustering_file_name)
+    def try_loading_clustering_from_file(self, label) -> bool:
+        file_name = ut.get_file_name_from_path(self.config_manager.get_config_value("dataset_path"))
+        file_name += "-" + self.embedding_method + "-" + label
+        clustering_file_name = self.clustering_directory + file_name + ".clustering"
+        embedding_file_name = self.clustering_directory + file_name + ".embedding"
+        silhouette_file_name = self.clustering_directory + file_name + ".silhouette"
 
-        self.log("Start static clusterization")
-        start_initialize_clustering = time.time()
-        self.global_series_embedding, self.clustering, self.best_silhouette = ct.cluster_dataset(data_frame_series, self.embedding_method)
-        self.clustering = np.reshape(self.clustering, newshape=data_frame_series.shape[1:])
-        new_emb_shape = data_frame_series.shape[1:] + tuple([self.global_series_embedding.shape[1]]) # todo verify if it works for parcorr
-        self.global_series_embedding = np.reshape(self.global_series_embedding, newshape=new_emb_shape)
-        self.log("--GLOBAL STATIC CLUSTERING--Initialized static global clustering: " + \
-                 str(time.time() - start_initialize_clustering))
-        self.tiling_is_updated = False
+        if self.bool_load_global_clustering_from_file and ut.file_exists(clustering_file_name):
+            self.global_series_embedding = np.load(embedding_file_name)
+            self.clustering              = np.load(clustering_file_name)
+            with open(silhouette_file_name, "w") as f:
+                self.best_silhouette = eval(f.readline())
+            return True
+        else:
+            return False
+
+    def save_clustering(self, label):
+        file_name = ut.get_file_name_from_path(self.config_manager.get_config_value("dataset_path"))
+        file_name += self.embedding_method + label
+
+        clustering_file_name = self.clustering_directory + file_name + ".clustering"
+        embedding_file_name = self.clustering_directory + file_name + ".embedding"
+        silhouette_file_name = self.clustering_directory + file_name + ".silhouette"
+
+        np.save(clustering_file_name, self.clustering)
+        np.save(embedding_file_name, self.global_series_embedding)
+        with open(silhouette_file_name, "w") as f:
+            f.write(str(self.best_silhouette))
+
+    def perform_global_static_clustering(self, data_frame_series: np.array, label):
+        if not self.try_loading_clustering_from_file(label):
+            self.log("Start static clusterization")
+            start_initialize_clustering = time.time()
+            self.global_series_embedding, self.clustering, self.best_silhouette = ct.cluster_dataset(data_frame_series, self.embedding_method)
+            self.clustering = np.reshape(self.clustering, newshape=data_frame_series.shape[1:])
+            new_emb_shape = data_frame_series.shape[1:] + tuple([self.global_series_embedding.shape[1]]) # todo verify if it works for parcorr
+            self.global_series_embedding = np.reshape(self.global_series_embedding, newshape=new_emb_shape)
+            self.log("--GLOBAL STATIC CLUSTERING--Initialized static global clustering: " + \
+                     str(time.time() - start_initialize_clustering))
+            self.save_clustering(label)
+            self.tiling_is_updated = False
 
     def perform_global_static_tiling(self, data_frame_series: np.array):
         # self.perform_global_static_clustering(data_frame_series)

@@ -118,7 +118,7 @@ class Learner(ABC):
 
     def update_cef(self, noise_level_for_cef, update_models_cef=True):
         print("Updating CEF - Model " + self.model_name)
-        reference_dataset = self.get_reference_dataset()#[:20] # Change to [:50] if debug
+        reference_dataset = self.get_reference_dataset() # Change to [:50] if debug
         noise_dataset = reference_dataset.copy()
         parameters_file = self.model_directory + \
                           self.model_name + \

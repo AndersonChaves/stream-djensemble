@@ -21,3 +21,6 @@ def list_all_files_in_dir(path, extension=''):
 
 def file_exists(path_to_file):
     return exists(path_to_file)
+
+def get_file_name_from_path(full_path_to_file: str):
+    return full_path_to_file.split("/")[-1]

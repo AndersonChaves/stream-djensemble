@@ -81,7 +81,8 @@ class DJEnsemble:
             self.start_global_clustering = time.time()
             # PERFORM STATIC CLUSTERING - GLOBAL
             if self.config_manager.get_config_value("clusterization_mode") == 'static':
-                self.cluster_manager.perform_global_static_clustering(self.dataset_manager.read_window(0, static_clusterization_range))
+                clusterization_window = self.dataset_manager.read_window(0, static_clusterization_range)
+                self.cluster_manager.perform_global_static_clustering(clusterization_window, label="time0to" + str(static_clusterization_range))
                 self.cluster_manager.perform_global_static_tiling(
                     self.dataset_manager.read_window(0, static_clusterization_range))
                 self.log("Global Clustering and Tiling Performed, total time: " + str(
