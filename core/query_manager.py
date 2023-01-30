@@ -58,6 +58,7 @@ class QueryManager():
         # 5. Get best model for each tile
         self.log("--------------------- CALCULATE ALLOCATION COSTS -------------------------------")
         ensemble = self.get_lower_cost_combination(error_estimative)
+        self.log("Best Ensemble: ", ensemble)
         chk_5 = time.time()
 
         # 6. Perform model prediction for each tile
@@ -73,7 +74,7 @@ class QueryManager():
             learner = models_manager.get_model_from_name(model_name)
             tile_metadata = tiling_metadata[tile_id]
             pred = self.perform_prediction(data_buffer, learner, tile_metadata)
-            print("DEBUG: Prediction Len is ", len(pred))
+            #print("DEBUG: Prediction Len is ", len(pred))
             tile_prediction[tile_id] = pred
             i += 1
 
@@ -132,7 +133,7 @@ class QueryManager():
         i_lat = intersection_lat[0] - tile_lat[0], intersection_lat[1] - tile_lat[0]
         i_lon = intersection_long[0] - tile_long[0], intersection_long[1] - tile_long[0]
 
-        print("DEBUG Compose: shape of tile_prediction is ", tile_prediction.shape)
+        #print("DEBUG Compose: shape of tile_prediction is ", tile_prediction.shape)
         if len(tile_prediction.shape) == 3:
             intersecting_data = tile_prediction[-1, i_lat[0]:i_lat[1] + 1, i_lon[0]:i_lon[1] + 1]
         else:
@@ -184,12 +185,11 @@ class QueryManager():
         for tile_id in error_estimative.keys():
             best_model, best_error = 'x', float('inf')
             for model_name, error in error_estimative[tile_id].items():
-                if error < best_error:
+                if error < best_error:# and model_name not in self.exclude_models_list:
                     best_model = model_name
                     best_error = error
             ensemble[tile_id] = (best_model, best_error)
         return ensemble
-
 
     def save_query_configurations(self, base_directory):
         for id, query in self.continuous_query.items():

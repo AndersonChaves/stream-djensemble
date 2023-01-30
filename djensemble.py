@@ -116,7 +116,7 @@ class DJEnsemble:
             self.log("Time generating visualization: " + str(time.time()-start_frame_visualization))
 
             if len(self.data_buffer) >= window_size:
-                self.update_frame_visualization()
+                #self.update_frame_visualization()
                 if self.config_manager.get_config_value("clusterization_mode") == 'dynamic':
                     start_clusterization = time.time()
                     self.update_clusters_online(self.data_buffer)
@@ -180,21 +180,19 @@ class DJEnsemble:
         for notifier in self.notifier_list:
             notifier.notify(msg)
 
-    def update_window_visualization(self):
-        query_ids = list(self.query_manager.get_all_query_ids())
-        continuous_query = self.query_manager.get_continuous_query(query_ids[0])
+    def update_window_visualization_for_clustering_and_tiling(self, continuous_query):
         self.log("Generating visualization: clustering")
         if self.cluster_manager.is_global_clustering():
             clustering = self.cluster_manager.clustering
         else:
             clustering = continuous_query.get_current_clustering()
         if len(clustering) > 10:
-            f_size = 1
+           f_size = 1
         else:
-            f_size = 15
+           f_size = 15
         core.view.save_figure_from_matrix(clustering, "clustering",
-                                          parent_directory = self.figures_directory,
-                                          write_values = True, font_size = f_size)
+                                         parent_directory = self.figures_directory,
+                                         write_values = True, font_size = f_size)
 
         self.log("Generating visualization: tiling")
         if self.cluster_manager.is_global_clustering():
@@ -203,12 +201,18 @@ class DJEnsemble:
             start_tiling = time.time()
             tiling = continuous_query.get_tiling()
         core.view.save_figure_from_matrix(tiling, "tiling",
-                                          parent_directory=self.figures_directory,
-                                          write_values=True, font_size = f_size)
+                                         parent_directory=self.figures_directory,
+                                         write_values=True, font_size = f_size)
 
         self.log("Generating visualization: current frame")
         core.view.save_figure_from_matrix(self.data_buffer[-1],
-                                          self.figures_directory +"current-frame")
+                                         self.figures_directory +"current-frame")
+
+    def update_window_visualization(self):
+        query_ids = list(self.query_manager.get_all_query_ids())
+        continuous_query = self.query_manager.get_continuous_query(query_ids[0])
+        if self.config_manager.get_config_value("clusterization_mode") == 'dynamic':
+            self.update_window_visualization_for_clustering_and_tiling(continuous_query)
 
         real_next_frame = self.read_record(self.t_current+1)
         x1, x2 = continuous_query.get_query_endpoints()
@@ -216,21 +220,18 @@ class DJEnsemble:
 
         self.log("Generating visualization: predicted frame")
         core.view.save_figure_from_matrix(continuous_query.get_predicted_series()[-1],
-                                          self.figures_directory + "predicted-frame",
+                                          self.figures_directory + "predicted-frame_" + str(self.t_current),
                                           write_values=True)
 
         self.log("Generating visualization: next real frame")
         core.view.save_figure_from_matrix(query_next_frame,
-                                          self.figures_directory + "next-frame-for-query",
+                                          self.figures_directory + "next-frame-for-query_" + str(self.t_current),
                                           write_values=True)
 
         self.log("Generating visualization: error graph")
         core.view.plot_graph_line(continuous_query.get_error_history(),
                                   self.figures_directory + "rmse-graph")
 
-        core.view.save_figure_from_matrix(query_next_frame,
-                                          self.figures_directory + "next-frame-for-query",
-                                          write_values=True)
         self.log("Images Updated")
 
 

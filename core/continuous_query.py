@@ -41,7 +41,7 @@ class ContinuousQuery(ConfigManager):
         if not self.is_clustering_initialized():
             self.initialize_clustering(dataset, clustering_method=method)
         else:
-            embedding, clustering = self.clustering_strategy.load_clustering_from_file(dataset, method)
+            embedding, clustering = self.clustering_strategy.update_clustering(dataset, method)
             _, lat, long = dataset.shape
             self.intracluster_variance = self.__calculate_intracluster_variance(embedding, clustering)
             self.embedding_frame = np.reshape(embedding, (lat, long, embedding.shape[-1]))  # Number of GLD parameters = 4
