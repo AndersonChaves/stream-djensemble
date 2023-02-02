@@ -14,7 +14,6 @@ class DJEnsemble:
     # --------------------------------------------------------------
     # Main High Level Functions ------------------------------------
     # --------------------------------------------------------------
-
     def __init__(self, config_manager: ConfigManager, notifier_list: list = None,
                      results_directory = ""):
         self.query_manager = None
@@ -125,8 +124,8 @@ class DJEnsemble:
                 self.perform_continuous_queries(self.query_manager, self.data_buffer,
                                                 self.models_manager, self.dataset_manager)
                 self.evaluate_error(self.read_record(self.t_current+1), self.query_manager)
-                if self.t_current % 100 == 0:
-                    self.update_window_visualization()
+                #if self.t_current % 200 == 0:
+                #self.update_window_visualization()
                 self.data_buffer = np.empty(self.get_buffer_shape())
                 if single_iteration:
                     data_stream_active = False
@@ -212,8 +211,8 @@ class DJEnsemble:
     def update_window_visualization(self):
         query_ids = list(self.query_manager.get_all_query_ids())
         continuous_query = self.query_manager.get_continuous_query(query_ids[0])
-        if self.config_manager.get_config_value("clusterization_mode") == 'dynamic':
-            self.update_window_visualization_for_clustering_and_tiling(continuous_query)
+        #if self.config_manager.get_config_value("clusterization_mode") == 'dynamic':
+        #    self.update_window_visualization_for_clustering_and_tiling(continuous_query)
 
         real_next_frame = self.read_record(self.t_current+1)
         x1, x2 = continuous_query.get_query_endpoints()

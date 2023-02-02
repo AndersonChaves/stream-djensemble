@@ -1,13 +1,13 @@
 from .learner import UnidimensionalLearner, MultidimensionalLearner
-import fnmatch
 import os
-from .dataset_manager import DatasetManager
+import core.utils as ut
+from core.tile import Tile
 
 class ModelsManager():
-    temporal_models      = []
-    convolutional_models = []
-
     def __init__(self, config_manager):
+        self.temporal_models = []
+        self.convolutional_models = []
+
         self.conv_models_path = config_manager.get_config_value("convolutional_models_path")
         self.temp_models_path = config_manager.get_config_value("temporal_models_path")
         self.update_models_cef = config_manager.get_config_value("update_models_cef") == 's'
@@ -30,7 +30,7 @@ class ModelsManager():
         return model_list
 
     def load_all_convolutional_models(self):
-        models_names = self.get_names_of_models_in_dir(self.conv_models_path)
+        models_names = ut.get_names_of_models_in_dir(self.conv_models_path)
         models_list = [self.load_convolutional_model(model) for model in models_names]
         return models_list
 
@@ -53,12 +53,6 @@ class ModelsManager():
 
     def include_temporal_models_from_directory(self, models_path):
         self.temp_models_path = models_path
-
-    def get_names_of_models_in_dir(self, models_path):
-        models = fnmatch.filter(os.listdir(models_path), '*.h5')
-        for i, m in enumerate(models):
-            models[i] = m.split('.h5')[0]
-        return models
 
     def get_latitude_input_size(self, model_name):
         model = self.get_model_from_name(model_name)
@@ -96,12 +90,19 @@ class ModelsManager():
         return self.temporal_models + self.convolutional_models
 
     def get_error_estimative_ranking(self, dataset,
-                                       tile, dataset_manager):
+                                       tile: Tile, dataset_manager, candidate_models):
         error_estimative = {}
-        tile_dataset = dataset_manager.get_data_from_tile(dataset, tile)
-        for learner in self.get_models():
-            error_estimative[learner.name] = learner.execute_eef(tile_dataset, tile.get_centroid())[0][0]
+        data_from_tile_region = dataset_manager.get_data_from_tile(dataset, tile)
+        for learner in candidate_models:
+            error_estimative[learner.name] = learner.execute_eef(data_from_tile_region,
+                                                                 tile)[0][0]
         return error_estimative
+
+    def get_models_from_list(self, models_list):
+        models = []
+        for model_name in models_list:
+            models.append(self.get_model_from_name(model_name))
+        return models
 
     def update_cef(self, noise_level_for_cef):
         for learner in self.get_models():

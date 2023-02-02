@@ -48,17 +48,19 @@ class QueryManager():
                     tiling_metadata.pop(tile_id)
         else:
             tiling_metadata = query.get_tiling_metadata()
+        self.log("TILING: Query has " + str(len(tiling_metadata.keys())) + \
+                   " Tiles. (Query " + query.query_id + ")")
         chk_3 = time.time()
 
         # 4. For each tile, get its representing series
         error_estimative = self.get_error_estimative(data_buffer, tiling_metadata,
-                                                       models_manager, dataset_manager)
+                                                       models_manager, dataset_manager, query)
         chk_4 = time.time()
 
         # 5. Get best model for each tile
         self.log("--------------------- CALCULATE ALLOCATION COSTS -------------------------------")
         ensemble = self.get_lower_cost_combination(error_estimative)
-        self.log("Best Ensemble: ", ensemble)
+        self.log("Best Ensemble: " + str(ensemble))
         chk_5 = time.time()
 
         # 6. Perform model prediction for each tile
@@ -153,13 +155,15 @@ class QueryManager():
         return self.continuous_query.keys()
 
     def get_error_estimative(self, data_window,
-                                tile_bounds, models_manager, dataset_manager):
+                             tile_metadata, models_manager, dataset_manager, query):
         error_estimative = {}
-        for tile_id in tile_bounds.keys():
+        for tile_id in tile_metadata.keys():
             self.log("----Estimating error for tile "+ str(tile_id))
-            t = Tile(tile_id, tile_bounds[tile_id]) # Self.tiles == tile_dim_dict
-            error_estimative[tile_id] = models_manager.get_error_estimative_ranking(data_window,
-                                                                                    t, dataset_manager)
+            t = Tile(tile_id, tile_metadata[tile_id]) # Self.tiles == tile_dim_dict
+            candidate_models_names = query.get_candidate_models_list()
+            candidate_models = models_manager.get_models_from_list(candidate_models_names)
+            error_estimative[tile_id] = models_manager.get_error_estimative_ranking(
+                  data_window, t, dataset_manager, candidate_models)
         return error_estimative
 
     def get_intersecting_tiles(self, tiling_metadata, x1, x2):

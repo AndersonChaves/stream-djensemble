@@ -4,14 +4,17 @@ from tensorflow.keras.models import model_from_json
 from functools import reduce
 import dtw
 import core.utils as ut
-from .noise_generator import NoiseGenerator
-from .series_generator import SeriesGenerator
-from .simple_regressor import LinearRegressor
-from .convolutional_model_invoker import ConvolutionalModelInvoker
-from .categorization import calculate_centroid
-from .categorization import get_gld_series_representation_from_dataset
-from .dataset import Dataset
+from core.noise_generator import NoiseGenerator
+from core.series_generator import SeriesGenerator
+from core.simple_regressor import LinearRegressor
+from core.convolutional_model_invoker import ConvolutionalModelInvoker
+from core.categorization import calculate_centroid
+from core.categorization import get_gld_series_representation_from_dataset
+from core.tile import Tile
+from core import model_training as mt
+from core.dataset import Dataset
 from abc import ABC, abstractmethod
+
 
 class Learner(ABC):
     model = None
@@ -24,6 +27,7 @@ class Learner(ABC):
         self.model_name = model_name
         self.number_of_training_samples = 10
         self._is_temporal_model = is_temporal_model
+        self.output_size = 1
         if auto_loading:
             self.load_model(model_directory, model_name)
         super().__init__()
@@ -97,6 +101,12 @@ class Learner(ABC):
         print("Calculating Centroid...")
         return calculate_centroid(gld_list, (0, 0), (lat, long))
 
+    def compare_series_distances(self, s1, s2):
+        # -. Identify the centroid time series C1 and C2 based on the resulting parameters
+        # -. Determine the distance between C1 and C2 (e.g. using euclidian dist between vectors)
+        output = dtw.dtw(s1, s2)
+        return output.distance
+
     def compare_dataset_distances(self, original_dataset, compared_dataset, c1, c2):
         # 2. Identify the centroid time series C1 and C2 based on the resulting parameters
         s1 = original_dataset[:, c1[0], c1[1]]
@@ -135,7 +145,7 @@ class Learner(ABC):
                 print("Evaluating model", self.model_name, " on noise dataset ", i)
                 error.append(self.evaluate(noise_dataset))
                 distances.append(self.compare_dataset_distances(reference_dataset, noise_dataset,
-                                                                    centroid, centroid))
+                                                               centroid, centroid))
                 NoiseGenerator().add_noise(noise_dataset)
             with open(parameters_file, "w") as f:
                 f.write("distances #" + str(distances) + "\n")
@@ -153,11 +163,17 @@ class Learner(ABC):
         r.train()
         self.r = r
 
-    def execute_eef(self, dataset, centroid):
-        reference_dataset = self.get_reference_dataset()
-        ref_centroid = self.get_reference_dataset_centroid_coordinate() #todo: verificar comparação se é pelo dado ou pelos embeddings
-        x = self.compare_dataset_distances(reference_dataset, dataset, ref_centroid, centroid)
+    def execute_eef(self, dataset, tile: Tile):
+        s1 = self.get_reference_learner_series()
+        s2 = tile.get_centroid_series()
+        x = self.compare_series_distances(s1, s2)
         return self.r.predict(x)
+
+    def get_reference_learner_series(self):
+        reference_dataset = self.get_reference_dataset() # Reference model training dataset
+        c1 = self.get_reference_dataset_centroid_coordinate()
+        return reference_dataset[:, c1[0], c1[1]]
+
 
 class UnidimensionalLearner(Learner):
     def evaluate(self, target_dataset: np.array):
@@ -168,25 +184,35 @@ class UnidimensionalLearner(Learner):
                 cut_start = 0
                 cut_ending = self.temporal_length + self.number_of_training_samples
 
+                from numpy.lib.stride_tricks import sliding_window_view
+                #samples = sliding_window_view(X=target_dataset[cut_start:cut_ending, i, j],
+                #                              axis=0)
+                #X, y = SeriesGenerator().numpy_split_series_x_and_ys_sliding_windows(
+                #         target_dataset[cut_start:cut_ending, i, j], self.temporal_length, 1)
                 X, y = SeriesGenerator().manual_split_series_into_sliding_windows(
                     target_dataset[cut_start:cut_ending, i, j], self.temporal_length, 1)
                 # X = X.reshape((self.number_of_samples, self.temporal_length, 1))
-                output = self.invoke(X)
+                #output = self.invoke(X)
+                output = mt.forecast_lstm(self.model, len(X), X)
                 region_rmse = tf.sqrt(tf.math.reduce_mean(tf.losses.mean_squared_error(output, y)))
                 rmse_vector.append(region_rmse.numpy())
         average_rmse = reduce(lambda a, b: a + b, rmse_vector) / len(rmse_vector)
         return average_rmse
 
     def invoke_on_dataset(self, target_dataset):
-        time, lat, long = target_dataset.shape
+        _, lat, long = target_dataset.shape
+        time = self.output_size
         output = np.empty((time, lat, long))
 
         for i in range(lat):
             for j in range(long):
                 input = target_dataset[:, i, j]
                 input = np.reshape(input, (10, 1))
-                out = self.invoke(input)
-                output[:, i, j] = np.reshape(out, (10))
+                out = mt.forecast_lstm(self.model, 1, input)
+                #out = self.invoke(input)
+
+                #output[:, i, j] = np.reshape(out, (10))
+                output[:, i, j] = out
         return output
 
 class MultidimensionalLearner(Learner):
@@ -215,6 +241,47 @@ def test_multidimensional_layer():
     l.update_cef(1)
     print(l.execute_eef(NoiseGenerator().add_noise(l.get_reference_dataset())))
 
+def test_learner(op):
+    from core.dataset_manager import DatasetManager
+    path = "/home/anderson/Programacao/DJEnsemble/Stream-DJEnsemble/datasets/CFSR-2014.nc"
+    ds = DatasetManager(path)
+    ds.loadDataset(ds_attribute="TMP_L100")
+    data = ds.read_window(t_instant=100, window_size=10)
+
+
+
+    #name = "CFSR-2014.nc-x0=(1, 1)-1x1-summer"
+
+
+
+    if op == "uni":
+        directory = "/home/anderson/Programacao/DJEnsemble/Stream-DJEnsemble/models/temporal/cfsr-all/"
+        name = "CFSR-2014.nc-x0=(53, 1)-1x1-summer"
+        l = UnidimensionalLearner(directory, name, is_temporal_model=True)
+        lt, lg = 53, 1
+        size = 1
+        data = np.load(directory + "CFSR-2014.nc-x0=(53, 1)-1x1-summer.npy")
+        data = np.reshape(data, newshape=(data.shape[0], 1, 1))
+        y = data[10, lt:lt + size, lg:lg + size]
+        input = data[:10, lt:lt + size, lg:lg + size]
+    else:
+        directory = "/home/anderson/Programacao/DJEnsemble/Stream-DJEnsemble/models/spatio-temporal/cfsr/"
+        lt, lg = 55, 2
+        size = 3
+        name = "CFSR-2014.nc-x0=(55, 2)-3x3-('2014-01-01 00:00:00', '2014-03-30 23:45:00')-summer"
+        l = MultidimensionalLearner(directory, name, is_temporal_model=False)
+        data = np.load(directory + name + ".npy")
+        y = data[10]
+        input = data[:10]
+
+
+    #yhat = l.invoke_on_dataset(input)
+    X = input
+    yhat = mt.forecast_conv_lstm(l.model, 1, X)
+    print(y - yhat)
+
 if __name__ == "__main__":
-    test_unidimensional_layer()
-    test_multidimensional_layer()
+    #test_unidimensional_layer()
+    #test_multidimensional_layer()
+    #test_unidimensional_layer_02()
+    test_learner("multi")

@@ -19,6 +19,7 @@ from tensorflow.python.keras.optimizer_v2.adam import Adam
 
 # frame a sequence as a supervised learning problem
 def timeseries_to_supervised(data, lag=1):
+    data = np.reshape(data, newshape=(data.shape[0], 1))
     df = DataFrame(data)
     columns = [df.shift(i) for i in reversed(range(1, lag+1))]
     columns.append(df)
@@ -210,11 +211,17 @@ def fit_conv_lstm(train, batch_size, nb_epoch, neurons, is_stateful=False, # tod
 
     return model
 
-# make a one-step forecast
+# make a bath-size-step forecast
 def forecast_lstm(model, batch_size, X):
-    X = X.reshape(1, len(X), 1)
+    X = X.reshape(batch_size, len(X), 1)
     yhat = model.predict(X, batch_size=batch_size)
-    return yhat[0, 0]
+    return yhat[:, 0]
+
+def forecast_conv_lstm(model, batch_size, X):
+    X = X.reshape(batch_size, *X.shape[:3], 1)
+    yhat = model.predict(X, batch_size=batch_size)
+    return yhat[..., 0]
+
 
 def transform_supervised(raw_series, series_size, differentiate=False):
     time_series = raw_series

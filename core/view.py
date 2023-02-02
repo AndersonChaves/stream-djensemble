@@ -22,22 +22,32 @@ def print_array_screen(array_list, title_list = None, cmap_list=None):
 
 def save_figure_from_matrix(matrix : np.array, title: str,
                               parent_directory='', write_values=False,
-                            font_size=15):
+                            font_size=5):
 
     matplotlib.use('TkAgg')
     if write_values:
         matplotlib.rcParams.update({'font.size': font_size})
     fig, ax = plt.subplots()
-    ax.matshow(matrix, cmap=plt.cm.Blues)
+
 
     if write_values:
         for i in range(matrix.shape[0]):
             for j in range(matrix.shape[1]):
                 c = round(matrix[i, j], 1)
-                ax.text(i, j, str(c), va='center', ha='center')
+                ax.text(i+0.5, j+0.5, str(c), va='center', ha='center')
                 # print("I, J: ", i, ' ', j)
 
+    plt.matshow(matrix, cmap=plt.cm.Blues)
+    min_val_lin, max_val_lin = 0, matrix.shape[0]
+    min_val_col, max_val_col = 0, matrix.shape[1]
+
+    ax.set_xlim(min_val_lin, max_val_lin)
+    ax.set_ylim(min_val_col, max_val_col)
+    ax.set_xticks(np.arange(max_val_lin))
+    ax.set_yticks(np.arange(max_val_col))
+
     fig.tight_layout()
+    ax.grid()
     fig.savefig(parent_directory + title + '.png', dpi=160)
     #plt.pause(1)
     plt.close("all")

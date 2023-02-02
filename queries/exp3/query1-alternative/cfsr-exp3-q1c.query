@@ -1,0 +1,27 @@
+#Models
+temporal_models_path                $ models/temporal/cfsr-all/
+convolutional_models_path           $ models/spatio-temporal/cfsr-all/
+temporal_length                     $ 10
+
+dataset_path                        $ datasets/CFSR-latin-america-2015-temp.nc
+clustering_period                   $ ('2020-01-01', '2020-01-02')
+online_period                       $ ('2020-01-03', '2020-01-03')
+query_region                        $ {"lat": (88, 98), "long": (22, 33)} #C1->C0
+target_attribute                    $ TMP_L100
+output_file_name                    $ results/query-cfsr
+
+#Query
+execute_offline                     $ S
+
+max_tile_area                       $ (0, 10, 0, 100)
+min_tile_length                     $ 6
+threshold                           $ 20.0
+number_of_samples                   $ 100
+offset                              $ 50
+prediction-length                   $ 1
+
+multiply_number_of_executions       $ N
+normalize_values                    $ N
+embedding_method                    $ parcorr
+tiling_method                       $ quadtree
+min_tiling_purity_rate              $ 0.9

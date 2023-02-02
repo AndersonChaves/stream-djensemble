@@ -6,10 +6,10 @@ from core.config_manager import ConfigManager
 
 
 # Global Configurations
-#global_configurations_path_config_1 = "experiment-metadata/djensemble-exp3-cfsr-cfg1.config"
-#global_configurations_path_config_2 = "experiment-metadata/djensemble-exp3-cfsr-cfg2.config"
-global_configurations_path_config_1 = "experiment-metadata/djensemble-exp3-rfrance-cfg1.config"
-global_configurations_path_config_2 = "experiment-metadata/djensemble-exp3-rfrance-cfg2.config"
+global_configurations_path_config_1 = "experiment-metadata/djensemble-exp3-cfsr-cfg1.config"
+global_configurations_path_config_2 = "experiment-metadata/djensemble-exp3-cfsr-cfg2.config"
+#global_configurations_path_config_1 = "experiment-metadata/djensemble-exp3-rfrance-cfg1.config"
+#global_configurations_path_config_2 = "experiment-metadata/djensemble-exp3-rfrance-cfg2.config"
 
 def run_from_file(global_configurations_path, cfg_number, results_file_name):
     cur_time = str(datetime.now())
@@ -19,7 +19,9 @@ def run_from_file(global_configurations_path, cfg_number, results_file_name):
                              results_directory=results_directory, notifier_list=[notifier])
     djensemble.run_offline_step()
 
-    for i in range(1):
+    #for i in range(800, 930, 10):
+    #for i in range(720, 820):
+    for i in range(0, 1440, 10):
       djensemble.run_online_step(single_iteration=True, t_start=i)
       djensemble.log("**************Experiment end. Start Time:" + str(cur_time) + "**************")
 

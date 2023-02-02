@@ -329,7 +329,7 @@ def calculate_centroid(clustering, start, end):
     from sklearn.metrics import pairwise_distances_argmin_min
     c, _ = pairwise_distances_argmin_min(np.reshape(centroid_gld, (1, -1)),
                                      np.reshape(tile_embedd, (t_shp[0] * t_shp[1], t_shp[2])))
-    print("Centroid: ", c)
+    #print("Centroid: ", c)
     centroid = c // t_shp[1], c % t_shp[1]
     # Returns the centroid position relative to the tile
     return centroid
@@ -340,7 +340,7 @@ def categorize_dataset(target_dataset, method, min_purity_rate):
     clustering_reshaped = np.reshape(kmeans_best_clustering, newshape=(lat, long))
     return perform_tiling(target_dataset, clustering_reshaped, method, min_purity_rate=min_purity_rate)
 
-def perform_tiling(embedding_frame, clustering_frame, method, min_purity_rate):
+def perform_tiling(target_dataset, embedding_frame, clustering_frame, method, min_purity_rate):
     if method == "yolo":
         tiling, tile_dict = create_yolo_tiling(clustering_frame, min_purity_rate)
     elif method == "quadtree":
@@ -356,7 +356,9 @@ def perform_tiling(embedding_frame, clustering_frame, method, min_purity_rate):
         tiling_metadata[tile_id]["lat"] = (start[0], end[0])
         tiling_metadata[tile_id]["long"] = (start[1], end[1])
         if embedding_frame is not None:
-            tiling_metadata[tile_id]["centroid"] = calculate_centroid(embedding_frame, start, end)
+            centroid = calculate_centroid(embedding_frame, start, end)
+            tiling_metadata[tile_id]["centroid"] = centroid
+            tiling_metadata[tile_id]["centroid_series"] = target_dataset[:, centroid[0], centroid[1]]
     return tiling, tiling_metadata
 
 def save_clustering(clustering):

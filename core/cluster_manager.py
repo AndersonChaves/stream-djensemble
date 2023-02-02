@@ -121,16 +121,20 @@ class ClusterManager():
         self.log("--GLOBAL STATIC TILING--Initialized clustering method " + ": " + \
                  str(time.time() - start_initialize_tiling))
 
-        self.tiling, self.tiling_metadata = ct.perform_tiling(emb_frame, self.clustering, tiling_method, purity)
+        self.tiling, self.tiling_metadata = ct.perform_tiling(data_frame_series, emb_frame,
+                                                              self.clustering, tiling_method, purity)
+        self.tiling_is_updated = True
         return self.tiling, self.tiling_metadata
 
     def get_tiling_metadata(self):
+        # if not self.tiling_is_updated:
+        #     emb_frame = self.global_series_embedding
+        #     tiling_method = self.config_manager.get_config_value("global_tiling_method")
+        #     purity = float(self.config_manager.get_config_value("global_min_tiling_purity_rate"))
+        #     self.tiling, self.tiling_metadata = ct.perform_tiling(target_dataset=emb_frame, self.clustering, tiling_method, purity)
+        #     self.tiling_is_updated = True
         if not self.tiling_is_updated:
-            emb_frame = self.global_series_embedding
-            tiling_method = self.config_manager.get_config_value("global_tiling_method")
-            purity = float(self.config_manager.get_config_value("global_min_tiling_purity_rate"))
-            self.tiling, self.tiling_metadata = ct.perform_tiling(emb_frame, self.clustering, tiling_method, purity)
-            self.tiling_is_updated = True
+            raise(Exception("Tiling may not be updated."))
         return self.tiling_metadata
 
     def get_current_number_of_tiles(self):

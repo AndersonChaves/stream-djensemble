@@ -5,6 +5,7 @@ class Tile():
         self.id = id
         self.bounds = dim_dict
         self.centroid = dim_dict["centroid"]
+        self.centroid_series = dim_dict["centroid_series"]
 
     def get_start_coordinate(self):
         return self.bounds["lat"][0], self.bounds["long"][0]
@@ -15,5 +16,8 @@ class Tile():
     def set_centroid(self, centroid):
         self.centroid = centroid
 
-    def get_centroid(self):
+    def get_centroid_coordinates(self):
         return self.centroid
+
+    def get_centroid_series(self):
+        return self.centroid_series

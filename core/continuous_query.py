@@ -2,6 +2,7 @@ import numpy as np
 from core.config_manager import ConfigManager
 from core.clustering_strategy import ClusteringStrategy
 import core.categorization as ct
+import core.utils as ut
 
 class ContinuousQuery(ConfigManager):
     def __init__(self, config_file_path, query_id):
@@ -12,6 +13,10 @@ class ContinuousQuery(ConfigManager):
             self.config_parameters["x2"] = d["lat"][1], d["long"][1]
             self.x1, self.x2 = self.get_config_value("x1"), self.get_config_value("x2")
             self.query_shape = self.x2[0] - self.x1[0], self.x2[1] - self.x1[1]
+
+        self.temporal_models_path = self.config_parameters["temporal_models_path"]
+        self.convolutional_models_path = self.config_parameters["convolutional_models_path"]
+
         self.query_id = query_id
         self.clustering = None
         self.clustering_strategy = None
@@ -21,6 +26,11 @@ class ContinuousQuery(ConfigManager):
     def get_query_endpoints(self):
         self.x1, self.x2 = self.get_config_value("x1"), self.get_config_value("x2")
         return self.x1, self.x2
+
+    def get_candidate_models_list(self):
+        temporal_models_names = ut.get_names_of_models_in_dir(self.temporal_models_path)
+        convolutional_models_names = ut.get_names_of_models_in_dir(self.convolutional_models_path)
+        return temporal_models_names + convolutional_models_names
 
     def is_clustering_initialized(self):
         if self.clustering_strategy == None:
@@ -46,7 +56,8 @@ class ContinuousQuery(ConfigManager):
             self.intracluster_variance = self.__calculate_intracluster_variance(embedding, clustering)
             self.embedding_frame = np.reshape(embedding, (lat, long, embedding.shape[-1]))  # Number of GLD parameters = 4
             self.clustering_frame = np.reshape(clustering, newshape=(lat, long))
-        self.tiling_is_updated = False
+        self.perform_tiling(dataset)
+        self.tiling_is_updated = True
 
     def get_current_clustering(self):
         if self.is_clustering_initialized():
@@ -60,23 +71,19 @@ class ContinuousQuery(ConfigManager):
         else:
             raise("Query Error: Clustering is not initialized.")
 
-    def perform_tiling(self): # Returns a dict with information about tiling: bounds and centroid
+    def perform_tiling(self, dataset): # Returns a dict with information about tiling: bounds and centroid
         series_embedding = self.get_current_series_embedding()
         clustering = self.get_current_clustering()
         p = eval(self.config_parameters["min_tiling_purity_rate"])
         tiling_method = self.config_parameters["tiling_method"]
-        self.tiling, self.tiling_metadata = ct.perform_tiling(
+        self.tiling, self.tiling_metadata = ct.perform_tiling(dataset,
                               series_embedding, clustering, method=tiling_method, min_purity_rate=p)
         self.tiling_is_updated = True
 
     def get_tiling_metadata(self) -> dict:
-        if not self.tiling_is_updated:
-            self.perform_tiling()
         return self.tiling_metadata
 
     def get_tiling(self):
-        if not self.tiling_is_updated:
-            self.perform_tiling()
         return self.tiling
 
     def set_predicted_series(self, predicted_series):

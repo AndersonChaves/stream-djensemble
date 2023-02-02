@@ -1,5 +1,6 @@
 import os
 from os.path import exists
+import fnmatch
 
 def create_directory_if_not_exists(path):
     if not os.path.exists(path):
@@ -11,6 +12,11 @@ def list_all_sub_directories(path):
 def list_all_directories(path):
     return next(os.walk(path))[1]
 
+def get_names_of_models_in_dir(models_path):
+    models = fnmatch.filter(os.listdir(models_path), '*.h5')
+    for i, m in enumerate(models):
+        models[i] = m.split('.h5')[0]
+    return models
 
 def list_all_files_in_dir(path, extension=''):
     res = []
