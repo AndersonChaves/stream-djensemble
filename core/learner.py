@@ -212,7 +212,7 @@ class UnidimensionalLearner(Learner):
         average_rmse = reduce(lambda a, b: a + b, rmse_vector) / len(rmse_vector)
         return average_rmse
 
-    def invoke_on_dataset(self, target_dataset):
+    def invoke_on_dataset_sequential(self, target_dataset):
         _, lat, long = target_dataset.shape
         time = self.output_size
         output = np.empty((time, lat, long))
@@ -221,12 +221,53 @@ class UnidimensionalLearner(Learner):
             for j in range(long):
                 input = target_dataset[:, i, j]
                 input = np.reshape(input, (10, 1))
-                out = mt.forecast_lstm(self.model, 1, input)
+                out = mt.forecast_lstm(self.model, batch_size=1, X=input)
                 #out = self.invoke(input)
 
                 #output[:, i, j] = np.reshape(out, (10))
                 output[:, i, j] = out
         return output
+
+    def invoke_on_dataset(self, target_dataset):
+        _, lat, long = target_dataset.shape
+        time = self.output_size
+        output = np.empty((time, lat, long))
+
+        input = np.swapaxes(target_dataset, 0, 1)
+        input = np.swapaxes(input, 1, 2)
+        input = np.reshape(input, (lat * long, 10, 1))
+        # input = np.reshape(input, (10, 1))
+        out = mt.forecast_lstm(self.model, batch_size=len(input), X=input)
+        for i in range(lat):
+            for j in range(long):
+                output[:, i, j] = out[i * j]
+        return output
+
+    # def invoke_on_dataset_parallel(self, target_dataset):
+    #     _, lat, long = target_dataset.shape
+    #     time = self.output_size
+    #     output = np.empty((time, lat, long))
+    #
+    #     input_list = []
+    #     for i in range(lat):
+    #         print("Invoking models for lat", i)
+    #         for j in range(long):
+    #             input = target_dataset[:, i, j]
+    #             input = np.reshape(input, (10, 1))
+    #             input_list.append(input)
+    #
+    #     import multiprocessing
+    #
+    #     with multiprocessing.Pool() as pool:
+    #         for result in pool.map(mt.forecast_lstm(self.model, batch_size=1, input), input_list):
+    #             gld_estimators = result
+    #             gld_estimators = np.reshape(gld_estimators, (1, 4))
+    #             gld_list = np.append(gld_list, gld_estimators, axis=0)
+    #
+    #     out = mt.forecast_lstm(self.model, 1, input)
+    #     output[:, i, j] = out
+    #     return output
+
 
 class MultidimensionalLearner(Learner):
     def evaluate(self, target_dataset: np.array):

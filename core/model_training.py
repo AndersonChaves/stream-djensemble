@@ -213,7 +213,7 @@ def fit_conv_lstm(train, batch_size, nb_epoch, neurons, is_stateful=False, # tod
 
 # make a bath-size-step forecast
 def forecast_lstm(model, batch_size, X):
-    X = X.reshape(batch_size, len(X), 1)
+    X = X.reshape(batch_size, 10, 1)
     yhat = model.predict(X, batch_size=batch_size)
     return yhat[:, 0]
 
