@@ -6,15 +6,14 @@ import dtw
 import core.utils as ut
 from core.noise_generator import NoiseGenerator
 from core.series_generator import SeriesGenerator
-from core.simple_regressor import LinearRegressor
+from core.simple_regressor import LinearRegressor, NonLinearRegressor
 from core.convolutional_model_invoker import ConvolutionalModelInvoker
 from core.categorization import calculate_centroid
 from core.categorization import get_gld_series_representation_from_dataset
 from core.tile import Tile
 from core import model_training as mt
-from core.dataset import Dataset
 from abc import ABC, abstractmethod
-
+from numpy.linalg import LinAlgError
 
 class Learner(ABC):
     model = None
@@ -101,11 +100,14 @@ class Learner(ABC):
         print("Calculating Centroid...")
         return calculate_centroid(gld_list, (0, 0), (lat, long))
 
-    def compare_series_distances(self, s1, s2):
+    def compare_series_distances(self, s1, s2, dist_function="dtw"):
         # -. Identify the centroid time series C1 and C2 based on the resulting parameters
         # -. Determine the distance between C1 and C2 (e.g. using euclidian dist between vectors)
         output = dtw.dtw(s1, s2)
-        return output.distance
+        d = output.distance
+        if d < 0:
+            raise (Exception("Error: Negative dtw Distance"))
+        return d
 
     def compare_dataset_distances(self, original_dataset, compared_dataset, c1, c2):
         # 2. Identify the centroid time series C1 and C2 based on the resulting parameters
@@ -113,7 +115,10 @@ class Learner(ABC):
         s2 = compared_dataset[:, c2[0], c2[1]]
         # 3. Determine the distance between C1 and C2 (e.g. using euclidian dist between vectors)
         output = dtw.dtw(s1, s2)
-        return output.distance
+        d = output.distance
+        if d < 0:
+            raise(Exception("Error: Negative dtw Distance"))
+        return d
 
     def calculate_centroid_coordinate(self, target_dataset):
         # Characterize each dataset time series (e.g. using GLD or Autoencoder)
@@ -126,7 +131,7 @@ class Learner(ABC):
         #    self.centroid = self.calculate_centroid_coordinate(self.get_reference_dataset())
         #return self.centroid
 
-    def update_cef(self, noise_level_for_cef, update_models_cef=True):
+    def update_cef(self, noise_level_for_cef, update_models_cef=True, linear_regression=False):
         print("Updating CEF - Model " + self.model_name)
         reference_dataset = self.get_reference_dataset() # Change to [:50] if debug
         noise_dataset = reference_dataset.copy()
@@ -136,7 +141,6 @@ class Learner(ABC):
                                   + ".parameters"
 
         if update_models_cef or not ut.file_exists(parameters_file):
-
             # Measures model performance
             distances = []
             error = []
@@ -159,8 +163,17 @@ class Learner(ABC):
 
 
         # Fit line
-        r = LinearRegressor(distances, error)
-        r.train()
+        if linear_regression:
+            r = LinearRegressor(distances, error)
+            r.train()
+        else:
+            while (True):
+                try:
+                    r = NonLinearRegressor(np.array(distances), np.array(error), label=self.model_name)
+                    r.train()
+                    break
+                except LinAlgError:
+                    print("Singular matrix error. Repeating...")
         self.r = r
 
     def execute_eef(self, dataset, tile: Tile):

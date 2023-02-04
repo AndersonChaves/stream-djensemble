@@ -94,8 +94,14 @@ class ModelsManager():
         error_estimative = {}
         data_from_tile_region = dataset_manager.get_data_from_tile(dataset, tile)
         for learner in candidate_models:
-            error_estimative[learner.name] = learner.execute_eef(data_from_tile_region,
-                                                                 tile)[0][0]
+            #if learner.name == "CFSR-2014.nc-x0=(80, 9)-7x7-(\'2014-01-01 00:00:00\', \'2014-03-30 23:45:00\')-summer"
+
+            error_est = learner.execute_eef(data_from_tile_region, tile)
+            #error_est = error_est[0][0]
+            if error_est < 0:
+                raise(Exception("Error - Cef Value is negative"))
+            #error_est = learner.execute_eef(data_from_tile_region, tile)
+            error_estimative[learner.name] = error_est
         return error_estimative
 
     def get_models_from_list(self, models_list):

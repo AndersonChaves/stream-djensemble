@@ -20,11 +20,30 @@ class ConvolutionalModelInvoker:
             if s % 10 == 0:
                 print("Evaluated frame ", s)
             # computes the rmse for the frame.
-            last_output_frame = frame_series_output[:, -1:, :, :]
+            last_output_frame = frame_series_output[:, -1, :, :]
             last_predicted_frame = predicted_frame_series[:, -1, :, :, :]
             last_output_frame = last_output_frame.reshape(last_predicted_frame.shape)
             loss = tf.sqrt(tf.math.reduce_mean(tf.losses.mean_squared_error(last_output_frame, last_predicted_frame)))
             rmse_by_frame.append(loss.numpy())
+        average_rmse = reduce(lambda a, b: a + b, rmse_by_frame) / len(rmse_by_frame)
+        return average_rmse
+
+
+    def evaluate_convolutional_model_new(self, target_dataset, model):
+        frame_series = np.array(list(SeriesGenerator().generate_frame_series(
+            target_dataset, model.temporal_length)))
+        # FOR EVERY FRAME SERIES IN TILE
+        rmse_by_frame = []
+
+        # gets a prediction from a model ensemble, the average pred of different models
+        predicted_frame_series = self.averaging_ensemble(frame_series, [model])
+
+        # computes the rmse for the frame.
+        last_output_frame = frame_series[:, :, -1:, :, :]
+        last_predicted_frame = predicted_frame_series[:, :, -1, :, :, :]
+        last_output_frame = last_output_frame.reshape(last_predicted_frame.shape)
+        loss = tf.sqrt(tf.math.reduce_mean(tf.losses.mean_squared_error(last_output_frame, last_predicted_frame)))
+        rmse_by_frame.append(loss.numpy())
         average_rmse = reduce(lambda a, b: a + b, rmse_by_frame) / len(rmse_by_frame)
         return average_rmse
 
@@ -33,7 +52,7 @@ class ConvolutionalModelInvoker:
             weights = [1 for i in range(len(learner_list))]
 
         y_m = []
-        length_x = frame_series.shape
+        length_x = []
         for i, learner in enumerate(learner_list):
             result_y, length_x = self.invoke_candidate_model(learner, frame_series)
             y_m.append(result_y)
