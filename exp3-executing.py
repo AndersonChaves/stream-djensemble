@@ -21,7 +21,7 @@ def run_from_file(global_configurations_path, cfg_number, results_file_name):
 
     #for i in range(800, 930, 10):
     #for i in range(720, 820):
-    for i in range(0, 1440, 10):
+    for i in range(0, 1440, 100):
       djensemble.run_online_step(single_iteration=True, t_start=i)
       djensemble.log("**************Experiment end. Start Time:" + str(cur_time) + "**************")
 
