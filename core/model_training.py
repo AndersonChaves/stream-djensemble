@@ -218,7 +218,7 @@ def forecast_lstm(model, batch_size, X):
     return yhat[:, 0]
 
 def forecast_conv_lstm(model, batch_size, X):
-    X = X.reshape(batch_size, *X.shape[:3], 1)
+    X = X.reshape(*X.shape[:], 1)
     yhat = model.predict(X, batch_size=batch_size)
     return yhat[..., 0]
 

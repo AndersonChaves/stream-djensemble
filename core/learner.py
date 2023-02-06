@@ -75,7 +75,7 @@ class Learner(ABC):
         if self.reference_dataset is None:
             dataset_full_path = self.model_directory + self.model_name + '.npy'
             self.reference_dataset = (np.load(dataset_full_path))
-            if len(self.reference_dataset.shape) == 1:
+            if len(self.reference_dataset.shape) < 3:
                 self.reference_dataset = np.reshape(self.reference_dataset,
                                                      (self.reference_dataset.shape[0], 1, 1))
         return self.reference_dataset
@@ -161,7 +161,6 @@ class Learner(ABC):
                 distances = eval(distances.strip())
                 error = eval(error.strip())
 
-
         # Fit line
         if linear_regression:
             r = LinearRegressor(distances, error)
@@ -175,6 +174,8 @@ class Learner(ABC):
                 except LinAlgError:
                     print("Singular matrix error. Repeating...")
         self.r = r
+
+
 
     def execute_eef(self, dataset, tile: Tile):
         s1 = self.get_reference_learner_series()
@@ -289,10 +290,10 @@ def test_unidimensional_layer():
     print(l.execute_eef(NoiseGenerator().add_noise(l.get_reference_dataset()), (0, 0)) )
 
 def test_multidimensional_layer():
-    directory = "/home/anderson/Dropbox/Doutorado/Tese/Fermatta/DJEnsemble/models/rain/convolutional/"
-    name = "best_DJ1_v1_upd"
+    directory = "/home/anderson/Programacao/DJEnsemble/Stream-DJEnsemble/models/spatio-temporal/cfsr-all/"
+    name = "CFSR-2014.nc-x0=(3, 3)-3x3-('2014-01-01 00:00:00', '2014-03-30 23:45:00')-summer"
     l = MultidimensionalLearner(directory, name, is_temporal_model=False)
-    l.update_cef(1)
+    l.update_cef(3)
     print(l.execute_eef(NoiseGenerator().add_noise(l.get_reference_dataset())))
 
 def test_learner(op):
@@ -336,6 +337,57 @@ def test_learner(op):
 
 if __name__ == "__main__":
     #test_unidimensional_layer()
-    #test_multidimensional_layer()
+    test_multidimensional_layer()
     #test_unidimensional_layer_02()
-    test_learner("multi")
+    #test_learner("multi")
+
+# def update_cef_not_working(self, noise_level_for_cef, update_models_cef=True, linear_regression=False):
+#     print("Updating CEF - Model " + self.model_name)
+#     reference_dataset = self.get_reference_dataset()  # Change to [:50] if debug
+#     noise_dataset = reference_dataset.copy()
+#     parameters_file = self.model_directory + \
+#                       self.model_name + \
+#                       "-noise_level-" + str(noise_level_for_cef) \
+#                       + ".parameters"
+#
+#     if update_models_cef or not ut.file_exists(parameters_file):
+#         # Measures model performance
+#         distances = []
+#         error = []
+#         centroid = self.get_reference_dataset_centroid_coordinate()
+#         # shp = reference_dataset.shape
+#         # if len(shp) < 3:
+#         #     centroid = np.reshape(reference_dataset, (shp[0], 1, 1))
+#         print("Evaluating model", self.model_name, " on noise datasets ")
+#         noise_dataset_list = [noise_dataset.copy()]
+#         for i in range(noise_level_for_cef):
+#             NoiseGenerator().add_noise(noise_dataset)
+#             noise_dataset_list.append(noise_dataset.copy())
+#             distances.append(self.compare_dataset_distances(reference_dataset, noise_dataset,
+#                                                             centroid, centroid))
+#         for i in range(noise_level_for_cef):
+#             error.append(self.evaluate(noise_dataset))
+#
+#         with open(parameters_file, "w") as f:
+#             f.write("distances #" + str(distances) + "\n")
+#             f.write("error #" + str(error) + "\n")
+#     else:
+#         with open(parameters_file) as f:
+#             distances = f.readline().split("#")[1]  # [:-1]
+#             error = f.readline().split("#")[1]  # [:-1]
+#             distances = eval(distances.strip())
+#             error = eval(error.strip())
+#
+#     # Fit line
+#     if linear_regression:
+#         r = LinearRegressor(distances, error)
+#         r.train()
+#     else:
+#         while (True):
+#             try:
+#                 r = NonLinearRegressor(np.array(distances), np.array(error), label=self.model_name)
+#                 r.train()
+#                 break
+#             except LinAlgError:
+#                 print("Singular matrix error. Repeating...")
+#     self.r = r
