@@ -1,5 +1,5 @@
 from functools import reduce
-
+import core.model_training as mt
 import core.dataset_manager as dataset_manager
 import tensorflow as tf
 import numpy as np
@@ -10,6 +10,21 @@ class ConvolutionalModelInvoker:
         pass
 
     def evaluate_convolutional_model(self, target_dataset, model):
+        X, y = SeriesGenerator().numpy_split_series_x_and_ys_sliding_windows(
+            target_dataset, model.temporal_length, 1)
+
+        predicted_frame_series = mt.forecast_conv_lstm(model.model, len(X), X)
+        y = np.reshape(y, (len(y), *y.shape[-2:]))
+        region_rmse = tf.sqrt(
+            tf.math.reduce_mean(
+                tf.losses.mean_squared_error(predicted_frame_series, y)
+            )
+        )
+        average_rmse = region_rmse
+
+        return average_rmse
+
+    def evaluate_convolutional_model_sequential(self, target_dataset, model):
         frame_series = SeriesGenerator().generate_frame_series(
             target_dataset, model.temporal_length)
         # FOR EVERY FRAME SERIES IN TILE
@@ -25,25 +40,6 @@ class ConvolutionalModelInvoker:
             last_output_frame = last_output_frame.reshape(last_predicted_frame.shape)
             loss = tf.sqrt(tf.math.reduce_mean(tf.losses.mean_squared_error(last_output_frame, last_predicted_frame)))
             rmse_by_frame.append(loss.numpy())
-        average_rmse = reduce(lambda a, b: a + b, rmse_by_frame) / len(rmse_by_frame)
-        return average_rmse
-
-
-    def evaluate_convolutional_model_new(self, target_dataset, model):
-        frame_series = np.array(list(SeriesGenerator().generate_frame_series(
-            target_dataset, model.temporal_length)))
-        # FOR EVERY FRAME SERIES IN TILE
-        rmse_by_frame = []
-
-        # gets a prediction from a model ensemble, the average pred of different models
-        predicted_frame_series = self.averaging_ensemble(frame_series, [model])
-
-        # computes the rmse for the frame.
-        last_output_frame = frame_series[:, :, -1:, :, :]
-        last_predicted_frame = predicted_frame_series[:, :, -1, :, :, :]
-        last_output_frame = last_output_frame.reshape(last_predicted_frame.shape)
-        loss = tf.sqrt(tf.math.reduce_mean(tf.losses.mean_squared_error(last_output_frame, last_predicted_frame)))
-        rmse_by_frame.append(loss.numpy())
         average_rmse = reduce(lambda a, b: a + b, rmse_by_frame) / len(rmse_by_frame)
         return average_rmse
 
