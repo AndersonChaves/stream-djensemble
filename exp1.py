@@ -8,6 +8,7 @@ import numpy as np
 from datetime import datetime
 from time import time
 from core.utils import create_directory_if_not_exists
+import sys
 
 # Global Configurations
 global_configurations_path = "experiment-metadata/djensemble-exp1.config"
@@ -16,10 +17,8 @@ config_manager = ConfigManager(global_configurations_path)
 cur_time = str(datetime.now())
 results_directory = "results/cfsr-static_clustering_dyn_silhouette-10:14/" + cur_time + "/"
 
-embedding_method="parcorr"
-
 def calculate_silhouette_through_time(initial_instant, window_size,
-                                        file_name, clustering_type = "dynamic",
+                                        file_name, embedding_method, clustering_type = "dynamic",
                                       clustering = None, silhouete_name="",
                                       history_gld_list = None):
     if clustering_type == "static" and clustering is None:
@@ -32,10 +31,10 @@ def calculate_silhouette_through_time(initial_instant, window_size,
             window_series = ds_manager.read_window(t_instant, t_instant + window_size)
             if window_series.shape[0] < window_size:
                 break
-            gld_list = ct.get_embedded_series_representation(window_series, method="parcorr")
-            ct.normalize_embedding_list(gld_list)
-            history_gld_list.append(gld_list)
-            local_dynamic_silhouette = silhouette_score(gld_list, clustering)
+            enbedding_list = ct.get_embedded_series_representation(window_series, method=embedding_method)
+            ct.normalize_embedding_list(enbedding_list)
+            history_gld_list.append(enbedding_list)
+            local_dynamic_silhouette = silhouette_score(enbedding_list, clustering)
 
             f.write("Frame " + str(t_instant) + ": \n")
             f.write("----Clustering: " + str(clustering) + ": \n")
@@ -49,12 +48,19 @@ def calculate_silhouette_through_time(initial_instant, window_size,
 if __name__ == '__main__':
     create_directory_if_not_exists(results_directory)
 
+    print(sys.argv)
+    if len(sys.argv) == 1:
+        raise Exception("Inform the embedding method: gld or parcorr")
+    embedding_method = sys.argv[1]
+
     # Load the Dataset
     ds_manager = DatasetManager(config_manager.get_config_value("dataset_path"))
     ds_manager.loadDataset(ds_attribute=config_manager.get_config_value("target_attribute"))
-    ds_manager.filter_by_region((10, 14), (10, 14))
+    #ds_manager.filter_by_region((10, 14), (10, 14))
+
 
     # ******************** FIRST TEST: PERFORM GLOBAL CLUSTERING **************
+
     start = time()
     gld_list, global_clustering, global_silhouette = ct.cluster_dataset(ds_manager.read_all_data(),
                                                                         embedding_method=embedding_method)
@@ -71,8 +77,9 @@ if __name__ == '__main__':
 
     with open(file_name, "a") as f:
         f.write("*************Calculating Silhouette Trough Time: Global Clustering" "\n")
-    history_gld_list_previous = calculate_silhouette_through_time(0, window_size=28, file_name=file_name,
-                                      clustering_type="static", clustering=global_clustering,
+    history_gld_list_previous = calculate_silhouette_through_time(0, embedding_method=embedding_method,
+                                        window_size=28, file_name=file_name,
+                                         clustering_type="static", clustering=global_clustering,
                                                          silhouete_name="Silh TEST1")
 
     # ******************** SECOND TEST: PERFORM LOCAL CLUSTERING, ANALYZE SILHOUETE Along windows **************
