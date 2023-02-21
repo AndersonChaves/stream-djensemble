@@ -15,7 +15,7 @@ global_configurations_path = "experiment-metadata/djensemble-exp1.config"
 config_manager = ConfigManager(global_configurations_path)
 
 cur_time = str(datetime.now())
-results_directory = "results/cfsr-static_clustering_dyn_silhouette-10:14/" + cur_time + "/"
+results_directory = "results/cfsr-static_clustering_dyn_silhouette/" + cur_time + "/"
 
 def calculate_silhouette_through_time(initial_instant, window_size,
                                         file_name, embedding_method, clustering_type = "dynamic",
@@ -47,11 +47,15 @@ def calculate_silhouette_through_time(initial_instant, window_size,
 
 if __name__ == '__main__':
     create_directory_if_not_exists(results_directory)
-
+    sys.argv = ["exp1.py", "parcorr", "5"]
     print(sys.argv)
-    if len(sys.argv) == 1:
+    if len(sys.argv) < 2:
         raise Exception("Inform the embedding method: gld or parcorr")
+    if len(sys.argv) < 3:
+        raise Exception("Inform the window size, in weeks (1 to 52)")
+
     embedding_method = sys.argv[1]
+    window_size = int(sys.argv[2]) * 4 * 7
 
     # Load the Dataset
     ds_manager = DatasetManager(config_manager.get_config_value("dataset_path"))
@@ -78,14 +82,14 @@ if __name__ == '__main__':
     with open(file_name, "a") as f:
         f.write("*************Calculating Silhouette Trough Time: Global Clustering" "\n")
     history_gld_list_previous = calculate_silhouette_through_time(0, embedding_method=embedding_method,
-                                        window_size=28, file_name=file_name,
+                                        window_size=window_size, file_name=file_name,
                                          clustering_type="static", clustering=global_clustering,
                                                          silhouete_name="Silh TEST1")
 
     # ******************** SECOND TEST: PERFORM LOCAL CLUSTERING, ANALYZE SILHOUETE Along windows **************
     silhouete_name = "Silh TEST2"
     start = time()
-    gld_list, clustering, local_dynamic_silhouette = ct.cluster_dataset(ds_manager.read_window(0, 28*4),
+    gld_list, clustering, local_dynamic_silhouette = ct.cluster_dataset(ds_manager.read_window(0, window_size),
                                                                         embedding_method=embedding_method)
     local_static_number_of_groups = len(set(clustering))
     local_static_clustering_time = str(time() - start)
@@ -101,11 +105,11 @@ if __name__ == '__main__':
 
     t_instant = 0
     it_gld_list = iter(history_gld_list_previous)
-    while (t_instant < ((365 * 4) + 28)):
+    while (t_instant < ((365 * 4) + window_size)):
         with open(file_name, "a") as f:
             start = time()
-            window_series = ds_manager.read_window(t_instant, t_instant+28)
-            if window_series.shape[0] < 28:
+            window_series = ds_manager.read_window(t_instant, t_instant+window_size)
+            if window_series.shape[0] < window_size:
                 break
             #gld_list = ct.calculate_gld_list_from_dataset(window_series)
             gld_list = next(it_gld_list)
@@ -119,43 +123,57 @@ if __name__ == '__main__':
             f.write(silhouete_name +": " + str(local_dynamic_silhouette) + "\n")
             local_static_clustering_time = str(time() - start)
             f.write("frame:" + str(t_instant) + "----Silhouette Time: " + str(local_static_clustering_time) + "\n")
-            t_instant += 28
+            t_instant += window_size
 
     # ******************** THIRD TEST: PERFORM DYNAMIC CLUSTERING, ANALYZE SILHOUETTE Along windows **************
     # Perform local dynamic Clustering
     silhouete_name = "Silh TEST3"
     local_clustering = []
-    history_gld_list = np.empty((0, 5))
+    history_gld_list = np.empty((0, 141, 153, 5))
     t_instant = 0
     it_gld_list = iter(history_gld_list_previous)
-    while(t_instant < ((365*4)+28)):
+    while(t_instant < ((365*4)+window_size)):
         with open(file_name, "a") as f:
             start = time()
-            frame_window_series = ds_manager.read_window(t_instant, t_instant+28)
-            if frame_window_series.shape[0] < 28:
+            frame_window_series = ds_manager.read_window(t_instant, t_instant+window_size)
+            if frame_window_series.shape[0] < window_size:
                 break
             gld_list = next(it_gld_list)
             local_cls_manager = ClusterManager(config_manager, n_clusters=local_static_number_of_groups)
-            gld_list, local_clustering = local_cls_manager.update_global_clustering(frame_window_series, gld_list)
+            local_cls_manager.update_global_clustering(frame_window_series, gld_list)
+            gld_list = local_cls_manager.global_series_embedding
+            local_clustering = local_cls_manager.clustering
             f.write("----Test 3: PERFORM DYNAMIC CLUSTERING, ANALYZE SILHOUETTE Along windows\n")
-            f.write("----Local Clustering t = " + str(t_instant) + " to " + str(t_instant + 28) + ": " + "\n")
+            f.write("----Local Clustering t = " + str(t_instant) + " to " + str(t_instant + window_size) + ": " + "\n")
             f.write(" ".join(str(item) for item in local_clustering) + "\n")
-            if len(set(local_clustering)) == 1:
+            if np.max(local_clustering) == np.min(local_clustering):
                 f.write(silhouete_name +": " + "++++Local Silhouette Score: " + "n/a" + "\n")
             else:
-                f.write(silhouete_name +": " + "++++Local Silhouette Score: " + str(silhouette_score(gld_list, local_clustering)) + "\n")
+                f.write(
+                    silhouete_name + ": " + "++++Local Silhouette Score: " +
+                     str(
+                         silhouette_score(
+                             np.reshape(gld_list, (-1, gld_list.shape[-1])),
+                             local_clustering.flatten() #np.reshape(local_clustering, (-1, local_clustering.shape[-1]))
+                         )
+                     ) + "\n"
+                )
             f.write("++++Local Clustering Time: " + str(time() - start) + "\n")
 
-            history_gld_list = np.concatenate((history_gld_list, gld_list), axis=0)
-            history_clustering = local_cls_manager.birch.predict(history_gld_list)
-
-            x = history_gld_list[:, 0]
-            y = history_gld_list[:, 2]
-            #view.save_figure_as_scatter_plot(x, y, history_clustering, results_directory + "clustering-" + str(t_instant), annotate=False)
-            print("Generating Figure")
-            if t_instant % (28 * 4) == 0:
-              view.save_figure_from_matrix(np.reshape(local_clustering, frame_window_series.shape[1:]), results_directory + "matrix-" + str(t_instant))
-            t_instant += 28
+            # history_gld_list = np.concatenate((
+            #     history_gld_list,
+            #     np.reshape(gld_list, (1, *gld_list.shape))
+            # ), axis=0)
+            # history_clustering = local_cls_manager.birch.predict(history_gld_list[-1])
+            #
+            # x = history_gld_list[:, 0]
+            # y = history_gld_list[:, 2]
+            # #view.save_figure_as_scatter_plot(x, y, history_clustering, results_directory + "clustering-" + str(t_instant), annotate=False)
+            # print("Generating Figure")
+            # if t_instant % (window_size * 4) == 0:
+            #   view.save_figure_from_matrix(np.reshape(local_clustering, frame_window_series.shape[1:]),
+            #                                results_directory + "matrix-" + str(t_instant))
+            t_instant += window_size
 
 
 
