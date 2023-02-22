@@ -208,7 +208,7 @@ if __name__ == '__main__':
                 base_directory=embedding_directory,
                 dataset_name=ds_name,
                 embedding_method=embedding_method,
-                time_start=0,
+                time_start=t_instant,
                 time_end=t_instant + window_size
             )
             #ct.normalize_gld_list(gld_list)
@@ -240,7 +240,7 @@ if __name__ == '__main__':
                 base_directory=embedding_directory,
                 dataset_name=ds_name,
                 embedding_method=embedding_method,
-                time_start=0,
+                time_start=t_instant,
                 time_end=t_instant + window_size
             )
             local_cls_manager = ClusterManager(config_manager, n_clusters=local_static_number_of_groups)
