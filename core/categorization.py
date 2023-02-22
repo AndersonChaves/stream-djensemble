@@ -8,6 +8,7 @@ from math import floor, ceil
 from itertools import cycle, repeat
 import multiprocessing
 from .quad_tree import QuadTree
+import time as libtime
 
 def print_array(array_list):
     from matplotlib import pyplot as plt
@@ -197,13 +198,15 @@ def get_gld_series_representation_from_dataset(target_dataset):
             X = X.reshape((len(X[0])))
             series_list.append(X)
 
+    start = libtime.time()
     gld_list = np.empty((0, 4))
     with multiprocessing.Pool() as pool:
         for result in pool.map(calculate_gld_estimator_using_fmkl, series_list):
             gld_estimators = result
             gld_estimators = np.reshape(gld_estimators, (1, 4))
             gld_list = np.append(gld_list, gld_estimators, axis=0)
-    print("GLDs calculated")
+    end = libtime.time()
+    print("GLDs calculated - Time = ", end-start)
     return gld_list
 
 def generate_parcorr_random_vectors(vector_size, basis_size):
@@ -270,8 +273,9 @@ def calculate_gld_estimator_using_fmkl(X: np.array):
     gld = GLD('FMKL')
     #param_MM = gld.fit_MM(X, [0.5, 1], bins_hist=20, maxiter=1000, maxfun=1000, disp_fit=False)
     indexes = np.array((range(len(X))))
+    i = 0
     while (True):
-        guess = [random.randint(-2, 2), random.randint(-2, 2)]
+        guess = [random.randint(0, 1) * 0.001, random.randint(0, 1)]
         #guess = (1, 1)
         try:
             param_MM = gld.fit_curve(indexes, X, initial_guess=guess, N_gen=1000,
@@ -279,7 +283,8 @@ def calculate_gld_estimator_using_fmkl(X: np.array):
             return param_MM[0]
         except Exception as e:
             #print(e)
-            #print("GLD Error: changing initial guess...")
+            print("GLD Error: changing initial guess... (Error) " + str(i))
+            i +=1
             continue
 
 def calculate_gld_estimator_using_vsl(X: np.array):
@@ -287,8 +292,9 @@ def calculate_gld_estimator_using_vsl(X: np.array):
     gld = GLD('VSL')
     #param_MM = gld.fit_MM(X, [0.5, 1], bins_hist=20, maxiter=1000, maxfun=1000, disp_fit=False)
     indexes = np.array((range(len(X))))
+    i = 0
     while (True):
-        guess = [random.randint(-2, 2), random.randint(-2, 2)]
+        guess = [random.randint(0, 1) * 0.001, random.randint(0, 1)]
         #guess = (1, 1)
         try:
             param_MM = gld.fit_curve(indexes, X, initial_guess=guess, N_gen=1000,
@@ -296,7 +302,8 @@ def calculate_gld_estimator_using_vsl(X: np.array):
             return param_MM[0]
         except Exception as e:
             #print(e)
-            #print("GLD Error: changing initial guess...")
+            print("GLD Error: changing initial guess... (Error) " + str(i))
+            i += 1
             continue
 
 
