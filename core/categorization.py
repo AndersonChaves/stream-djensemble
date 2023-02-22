@@ -282,6 +282,24 @@ def calculate_gld_estimator_using_fmkl(X: np.array):
             #print("GLD Error: changing initial guess...")
             continue
 
+def calculate_gld_estimator_using_vsl(X: np.array):
+    # GLD Using python library
+    gld = GLD('VSL')
+    #param_MM = gld.fit_MM(X, [0.5, 1], bins_hist=20, maxiter=1000, maxfun=1000, disp_fit=False)
+    indexes = np.array((range(len(X))))
+    while (True):
+        guess = [random.randint(-2, 2), random.randint(-2, 2)]
+        #guess = (1, 1)
+        try:
+            param_MM = gld.fit_curve(indexes, X, initial_guess=guess, N_gen=1000,
+                                     optimization_phase=False, shift=True, disp_fit=False)
+            return param_MM[0]
+        except Exception as e:
+            #print(e)
+            #print("GLD Error: changing initial guess...")
+            continue
+
+
 def get_embedded_series_representation(target_dataset, method):
     if method == "gld":
         series_embedding_matrix = get_gld_series_representation_from_dataset(target_dataset)
@@ -290,10 +308,14 @@ def get_embedded_series_representation(target_dataset, method):
         series_embedding_matrix = get_parcorr_series_representation_from_dataset(target_dataset)
     else:
         raise Exception("Clustering Method chosen has not been implemented")
+
+
     return series_embedding_matrix
 
-def cluster_dataset(target_dataset, embedding_method, min_clusters=2):
-    series_embedding_matrix = get_embedded_series_representation(target_dataset, embedding_method)
+def cluster_dataset(target_dataset, embedding_method,
+                     min_clusters=2, series_embedding_matrix=None):
+    if series_embedding_matrix is None:
+        series_embedding_matrix = get_embedded_series_representation(target_dataset, embedding_method)
 
     # Cluster using k-means into n clusters
     best_silhouete = -2

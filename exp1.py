@@ -1,3 +1,5 @@
+from pyparsing import unicode_set
+import core.utils as ut
 from core.config_manager import ConfigManager
 from core.cluster_manager import ClusterManager
 from core.dataset_manager import DatasetManager
@@ -16,25 +18,63 @@ config_manager = ConfigManager(global_configurations_path)
 
 cur_time = str(datetime.now())
 results_directory = "results/cfsr-static_clustering_dyn_silhouette/" + cur_time + "/"
+embedding_directory = "results/clustering/"
+
+def save_embedding(embedding, base_directory, dataset_name, embedding_method, time_start, time_end):
+    file_name = base_directory + dataset_name + "-" + \
+        embedding_method + "-" + \
+        "time" + str(time_start) + "to" + str(time_end) + \
+        ".embedding.npy"
+    np.save(file_name, embedding)
+
+def load_embedding_if_exists(base_directory,
+                             dataset_name,
+                             embedding_method,
+                             time_start, time_end):
+    file_name = base_directory + dataset_name + "-" + \
+        embedding_method + "-" + \
+        "time" + str(time_start) + "to" + str(time_end) + \
+        ".embedding.npy"
+    embedding = None
+    if ut.file_exists(file_name):
+        embedding = np.load(file_name)
+    return embedding
 
 def calculate_silhouette_through_time(initial_instant, window_size,
                                         file_name, embedding_method, clustering_type = "dynamic",
-                                      clustering = None, silhouete_name="",
-                                      history_gld_list = None):
+                                      clustering = None, silhouete_name=""):
     if clustering_type == "static" and clustering is None:
         raise Exception("Clustering is static, but empty")
-    t_instant = initial_instant
+
     history_gld_list = []
+    t_instant = initial_instant
+    i = 0
     while (t_instant < ((365 * 4) + window_size)):
         with open(file_name, "a") as f:
             start = time()
             window_series = ds_manager.read_window(t_instant, t_instant + window_size)
             if window_series.shape[0] < window_size:
                 break
-            enbedding_list = ct.get_embedded_series_representation(window_series, method=embedding_method)
-            ct.normalize_embedding_list(enbedding_list)
-            history_gld_list.append(enbedding_list)
-            local_dynamic_silhouette = silhouette_score(enbedding_list, clustering)
+            embedding_list = load_embedding_if_exists(
+                base_directory=embedding_directory,
+                dataset_name=ds_name,
+                embedding_method=embedding_method,
+                time_start=0,
+                time_end=t_instant + window_size
+            )
+            if embedding_list is None:
+                embedding_list = ct.get_embedded_series_representation(window_series, method=embedding_method)
+                save_embedding(
+                    embedding_list,
+                    base_directory=embedding_directory,
+                    dataset_name=ds_name,
+                    embedding_method=embedding_method,
+                    time_start=t_instant,
+                    time_end=t_instant + window_size
+                )
+                history_gld_list.append(embedding_list)
+
+            local_dynamic_silhouette = silhouette_score(embedding_list, clustering)
 
             f.write("Frame " + str(t_instant) + ": \n")
             f.write("----Clustering: " + str(clustering) + ": \n")
@@ -47,7 +87,7 @@ def calculate_silhouette_through_time(initial_instant, window_size,
 
 if __name__ == '__main__':
     create_directory_if_not_exists(results_directory)
-    sys.argv = ["exp1.py", "parcorr", "5"]
+    sys.argv = ["exp1.py", "parcorr", "1"]
     print(sys.argv)
     if len(sys.argv) < 2:
         raise Exception("Inform the embedding method: gld or parcorr")
@@ -58,16 +98,37 @@ if __name__ == '__main__':
     window_size = int(sys.argv[2]) * 4 * 7
 
     # Load the Dataset
-    ds_manager = DatasetManager(config_manager.get_config_value("dataset_path"))
+    ds_path = config_manager.get_config_value("dataset_path")
+    ds_name = ds_path.split('/')[-1]
+    ds_manager = DatasetManager(ds_path)
+
     ds_manager.loadDataset(ds_attribute=config_manager.get_config_value("target_attribute"))
     #ds_manager.filter_by_region((10, 14), (10, 14))
-
 
     # ******************** FIRST TEST: PERFORM GLOBAL CLUSTERING **************
 
     start = time()
-    gld_list, global_clustering, global_silhouette = ct.cluster_dataset(ds_manager.read_all_data(),
-                                                                        embedding_method=embedding_method)
+    all_data = ds_manager.read_all_data()
+    embedding_list = load_embedding_if_exists(
+                         base_directory=embedding_directory,
+                         dataset_name=ds_name,
+                         embedding_method=embedding_method,
+                         time_start=0,
+                         time_end=len(all_data)
+                     )
+    embedding_list, global_clustering, global_silhouette = ct.cluster_dataset(
+                                                                    all_data,
+                                                                    embedding_method=embedding_method,
+                                                                    series_embedding_matrix=embedding_list
+                                                           )
+    save_embedding(
+        embedding_list,
+        base_directory=embedding_directory,
+        dataset_name=ds_name,
+        embedding_method=embedding_method,
+        time_start=0,
+        time_end=len(all_data)
+    )
     global_number_of_groups = len(set(global_clustering))
     global_clustering_time = str(time() - start)
 
@@ -81,16 +142,38 @@ if __name__ == '__main__':
 
     with open(file_name, "a") as f:
         f.write("*************Calculating Silhouette Trough Time: Global Clustering" "\n")
-    history_gld_list_previous = calculate_silhouette_through_time(0, embedding_method=embedding_method,
-                                        window_size=window_size, file_name=file_name,
-                                         clustering_type="static", clustering=global_clustering,
-                                                         silhouete_name="Silh TEST1")
+    history_embedded_series_representations = calculate_silhouette_through_time(
+                        0,
+                        embedding_method=embedding_method,
+                        window_size=window_size,
+                        file_name=file_name,
+                        clustering_type="static",
+                        clustering=global_clustering,
+                        silhouete_name="Silhuette Config 1 Method" + embedding_method
+    )
 
     # ******************** SECOND TEST: PERFORM LOCAL CLUSTERING, ANALYZE SILHOUETE Along windows **************
-    silhouete_name = "Silh TEST2"
+    silhouete_name = "Silhuette Config 2"
     start = time()
-    gld_list, clustering, local_dynamic_silhouette = ct.cluster_dataset(ds_manager.read_window(0, window_size),
-                                                                        embedding_method=embedding_method)
+    embedding_list = load_embedding_if_exists(
+        base_directory=embedding_directory,
+        dataset_name=ds_name,
+        embedding_method=embedding_method,
+        time_start=0,
+        time_end= 28 * 4
+    )
+    embedding_list, clustering, local_dynamic_silhouette = ct.cluster_dataset(ds_manager.read_window(0, 28 * 4),
+                                                                              embedding_method=embedding_method,
+                                                                              series_embedding_matrix=embedding_list)
+    save_embedding(
+        embedding_list,
+        base_directory=embedding_directory,
+        dataset_name=ds_name,
+        embedding_method=embedding_method,
+        time_start=0,
+        time_end=28*4
+    )
+
     local_static_number_of_groups = len(set(clustering))
     local_static_clustering_time = str(time() - start)
 
@@ -104,7 +187,7 @@ if __name__ == '__main__':
         f.write("----Local Static Clustering Time: " + str(local_static_clustering_time) + "\n")
 
     t_instant = 0
-    it_gld_list = iter(history_gld_list_previous)
+    it_gld_list = iter(history_embedded_series_representations)
     while (t_instant < ((365 * 4) + window_size)):
         with open(file_name, "a") as f:
             start = time()
@@ -112,9 +195,9 @@ if __name__ == '__main__':
             if window_series.shape[0] < window_size:
                 break
             #gld_list = ct.calculate_gld_list_from_dataset(window_series)
-            gld_list = next(it_gld_list)
+            embedding_list = next(it_gld_list)
             #ct.normalize_gld_list(gld_list)
-            local_dynamic_silhouette = silhouette_score(gld_list, clustering)
+            local_dynamic_silhouette = silhouette_score(embedding_list, clustering)
 
             f.write("----STATIC CLUSTERING, DYNAMIC SILHOUETTE Frame " + str(t_instant) + ": \n")
             f.write("----Number of Groups: " + str(local_static_number_of_groups) + "\n")
@@ -131,17 +214,17 @@ if __name__ == '__main__':
     local_clustering = []
     history_gld_list = np.empty((0, 141, 153, 5))
     t_instant = 0
-    it_gld_list = iter(history_gld_list_previous)
+    it_gld_list = iter(history_embedded_series_representations)
     while(t_instant < ((365*4)+window_size)):
         with open(file_name, "a") as f:
             start = time()
             frame_window_series = ds_manager.read_window(t_instant, t_instant+window_size)
             if frame_window_series.shape[0] < window_size:
                 break
-            gld_list = next(it_gld_list)
+            embedding_list = next(it_gld_list)
             local_cls_manager = ClusterManager(config_manager, n_clusters=local_static_number_of_groups)
-            local_cls_manager.update_global_clustering(frame_window_series, gld_list)
-            gld_list = local_cls_manager.global_series_embedding
+            local_cls_manager.update_global_clustering(frame_window_series, embedding_list)
+            embedding_list = local_cls_manager.global_series_embedding
             local_clustering = local_cls_manager.clustering
             f.write("----Test 3: PERFORM DYNAMIC CLUSTERING, ANALYZE SILHOUETTE Along windows\n")
             f.write("----Local Clustering t = " + str(t_instant) + " to " + str(t_instant + window_size) + ": " + "\n")
@@ -153,7 +236,7 @@ if __name__ == '__main__':
                     silhouete_name + ": " + "++++Local Silhouette Score: " +
                      str(
                          silhouette_score(
-                             np.reshape(gld_list, (-1, gld_list.shape[-1])),
+                             np.reshape(embedding_list, (-1, embedding_list.shape[-1])),
                              local_clustering.flatten() #np.reshape(local_clustering, (-1, local_clustering.shape[-1]))
                          )
                      ) + "\n"
