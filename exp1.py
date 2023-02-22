@@ -12,12 +12,17 @@ from time import time
 from core.utils import create_directory_if_not_exists
 import sys
 
+filter_query_region = False
+
 # Global Configurations
 global_configurations_path = "experiment-metadata/djensemble-exp1.config"
 config_manager = ConfigManager(global_configurations_path)
 
 cur_time = str(datetime.now())
-results_directory = "results/cfsr-static_clustering_dyn_silhouette/" + cur_time + "/"
+if filter_query_region:
+    results_directory = "results/cfsr-static_clustering_dyn_silhouette-10:14/" + cur_time + "/"
+else:
+    results_directory = "results/cfsr-static_clustering_dyn_silhouette/" + cur_time + "/"
 embedding_directory = "results/clustering/"
 
 def save_embedding(embedding, base_directory, dataset_name, embedding_method, time_start, time_end):
@@ -103,7 +108,9 @@ if __name__ == '__main__':
     ds_manager = DatasetManager(ds_path)
 
     ds_manager.loadDataset(ds_attribute=config_manager.get_config_value("target_attribute"))
-    #ds_manager.filter_by_region((10, 14), (10, 14))
+
+    if filter_query_region:
+        ds_manager.filter_by_region((10, 14), (10, 14))
 
     # ******************** FIRST TEST: PERFORM GLOBAL CLUSTERING **************
 
@@ -162,17 +169,19 @@ if __name__ == '__main__':
         time_start=0,
         time_end= 28 * 4
     )
-    embedding_list, clustering, local_dynamic_silhouette = ct.cluster_dataset(ds_manager.read_window(0, 28 * 4),
-                                                                              embedding_method=embedding_method,
-                                                                              series_embedding_matrix=embedding_list)
-    save_embedding(
-        embedding_list,
-        base_directory=embedding_directory,
-        dataset_name=ds_name,
-        embedding_method=embedding_method,
-        time_start=0,
-        time_end=28*4
-    )
+    if not (embedding_list is None):
+        embedding_list, clustering, local_dynamic_silhouette = ct.cluster_dataset(ds_manager.read_window(0, 28 * 4),
+                                                                                  embedding_method=embedding_method,
+                                                                                  series_embedding_matrix=embedding_list)
+        save_embedding(
+            embedding_list,
+            base_directory=embedding_directory,
+            dataset_name=ds_name,
+            embedding_method=embedding_method,
+            time_start=0,
+            time_end=28*4
+        )
+
 
     local_static_number_of_groups = len(set(clustering))
     local_static_clustering_time = str(time() - start)
@@ -195,7 +204,13 @@ if __name__ == '__main__':
             if window_series.shape[0] < window_size:
                 break
             #gld_list = ct.calculate_gld_list_from_dataset(window_series)
-            embedding_list = next(it_gld_list)
+            embedding_list = load_embedding_if_exists(
+                base_directory=embedding_directory,
+                dataset_name=ds_name,
+                embedding_method=embedding_method,
+                time_start=0,
+                time_end=t_instant + window_size
+            )
             #ct.normalize_gld_list(gld_list)
             local_dynamic_silhouette = silhouette_score(embedding_list, clustering)
 
@@ -221,7 +236,13 @@ if __name__ == '__main__':
             frame_window_series = ds_manager.read_window(t_instant, t_instant+window_size)
             if frame_window_series.shape[0] < window_size:
                 break
-            embedding_list = next(it_gld_list)
+            embedding_list = load_embedding_if_exists(
+                base_directory=embedding_directory,
+                dataset_name=ds_name,
+                embedding_method=embedding_method,
+                time_start=0,
+                time_end=t_instant + window_size
+            )
             local_cls_manager = ClusterManager(config_manager, n_clusters=local_static_number_of_groups)
             local_cls_manager.update_global_clustering(frame_window_series, embedding_list)
             embedding_list = local_cls_manager.global_series_embedding
