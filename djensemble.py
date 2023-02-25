@@ -184,7 +184,8 @@ class DJEnsemble:
             ut.get_file_name_from_path(
                 self.config_manager.config_file_path
             ).split('.')[0] +
-            "___" + str(self.start_time) + ".csv"
+            "___" + str(self.start_time) + ".csv",
+            sep=';'
         )
 
 
