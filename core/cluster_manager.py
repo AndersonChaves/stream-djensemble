@@ -8,10 +8,12 @@ from .series_generator import SeriesGenerator
 import time
 
 class ClusterManager():
-    def __init__(self, config_manager: ConfigManager, n_clusters=4, notifier_list = None):
+    def __init__(self, config_manager: ConfigManager,
+                   n_clusters=4, notifier_list = None, benchmarks=None):
         self.notifier_list = []
         if notifier_list is not None:
             self.notifier_list = notifier_list
+        self.benchmarks = benchmarks
         self.config_manager = config_manager
         self.clustering_algorithm = config_manager.get_config_value("clustering_algorithm")
         self.bool_load_global_clustering_from_file = config_manager.get_config_value(
@@ -30,32 +32,60 @@ class ClusterManager():
 
     def update_clustering_local(self, update_dataset: np.array,
                                 query_manager: QueryManager):
+        clustering_benchmarks = {}
         for query_id in query_manager.get_all_query_ids():
             start_update_clustering = time.time()
             continuous_query = query_manager.get_continuous_query(query_id)
             x1, x2 = continuous_query.get_query_endpoints()
             query_dataset = update_dataset[:, x1[0]:x2[0], x1[1]:x2[1]]
-            continuous_query.update_clustering(query_dataset)
+            query_clulstering_benchmarks = continuous_query.update_clustering(query_dataset)
+            for key, value in query_clulstering_benchmarks.items():
+                clustering_benchmarks[query_id + "_" + key] = value
 
+            clustering_time =time.time() - start_update_clustering
             self.log("--CLUSTERING--Updated local clustering: query" + str(query_id) + ":" + \
-              str(time.time() - start_update_clustering))
+              str(clustering_time))
 
             self.log("--TILING--Number of tiles: query" + str(query_id) + ":" + \
                      str(continuous_query.get_current_number_of_tiles()))
+        return clustering_benchmarks
 
-    def update_global_clustering(self, update_dataset: np.array, embeddings_list=None):
+
+    def update_global_clustering(self, update_dataset: np.array,
+                                 embeddings_list=None):
+        clustering_benchmarks = {}
         start_update_clustering = time.time()
         if embeddings_list is None:
             embeddings_list = ct.get_embedded_series_representation(update_dataset, method=self.embedding_method)
             ct.normalize_embedding_list(embeddings_list)
+        else:
+            shp = embeddings_list.shape
+            embeddings_list = np.reshape(embeddings_list, (shp[0] * shp[1], shp[2]))
+
         self.global_series_embedding = embeddings_list
         new_emb_shape = update_dataset.shape[1:] +  tuple([embeddings_list.shape[-1]])
         self.clustering = self.cluster_embeddings_using_birch(self.global_series_embedding)
         self.clustering = np.reshape(self.clustering, newshape=new_emb_shape[:-1])
         self.global_series_embedding = np.reshape(embeddings_list, newshape=new_emb_shape)
 
+        clustering_time = time.time() - start_update_clustering
         self.log("--GLOBAL CLUSTERING--Updated global clustering, method " + self.embedding_method + \
-                 ': ' + str(time.time() - start_update_clustering))
+                 ': ' + str(clustering_time))
+
+        start_update_tiling = time.time()
+        self.perform_global_static_tiling(update_dataset)
+        tiling_time = time.time() - start_update_tiling
+
+        clustering_benchmarks["GLOBAL_CLUSTERING_METHOD"] = self.embedding_method
+        clustering_benchmarks["GLOBAL_CLUSTERING_TIME"] = clustering_time
+        clustering_benchmarks["GLOBAL_N_CLUSTERS"] = len(np.unique(self.clustering))
+
+        clustering_benchmarks["GLOBAL_TILING_TIME"] = tiling_time
+        clustering_benchmarks["GLOBAL_TILING_METHOD"] = self.config_manager.get_config_value("global_tiling_method")
+        clustering_benchmarks["GLOBAL_N_TILES"] = len(self.get_tiling_metadata().keys())
+        self.tiling_is_updated = True
+        return clustering_benchmarks
+
 
     def cluster_embeddings_using_birch(self, emb_list: np.array):
         self.birch = self.birch.partial_fit(emb_list)
@@ -104,7 +134,7 @@ class ClusterManager():
             self.clustering = np.reshape(self.clustering, newshape=data_frame_series.shape[1:])
             new_emb_shape = data_frame_series.shape[1:] + tuple([self.global_series_embedding.shape[1]]) # todo verify if it works for parcorr
             self.global_series_embedding = np.reshape(self.global_series_embedding, newshape=new_emb_shape)
-            self.log("--GLOBAL STATIC CLUSTERING--Initialized static global clustering: " + \
+            self.log("--GLOBAL CLUSTERING--Performed static global clustering: " + \
                      str(time.time() - start_initialize_clustering))
             self.save_clustering(label)
             self.tiling_is_updated = False
@@ -118,11 +148,10 @@ class ClusterManager():
         emb_frame = self.global_series_embedding
         tiling_method = self.config_manager.get_config_value("global_tiling_method")
         purity = float(self.config_manager.get_config_value("global_min_tiling_purity_rate"))
-        self.log("--GLOBAL STATIC TILING--Initialized clustering method " + ": " + \
-                 str(time.time() - start_initialize_tiling))
-
+        self.log("--GLOBAL STATIC TILING--Performing tiling. " + ": ")
         self.tiling, self.tiling_metadata = ct.perform_tiling(data_frame_series, emb_frame,
                                                               self.clustering, tiling_method, purity)
+        self.log("Static tiling time: " + str(time.time() - start_initialize_tiling))
         self.tiling_is_updated = True
         return self.tiling, self.tiling_metadata
 

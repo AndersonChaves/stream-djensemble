@@ -9,6 +9,29 @@ from itertools import cycle, repeat
 import multiprocessing
 from .quad_tree import QuadTree
 import time as libtime
+import core.utils as ut
+
+def load_embedding_if_exists(base_directory,
+                             dataset_name,
+                             embedding_method,
+                             time_start, time_end):
+    file_name = base_directory + dataset_name + "-" + \
+        embedding_method + "-" + \
+        "time" + str(time_start) + "to" + str(time_end) + \
+        ".embedding.npy"
+    embedding = None
+    print("Trying to load ", file_name)
+    if ut.file_exists(file_name):
+        embedding = np.load(file_name)
+        print("Load successful")
+    return embedding
+
+def save_embedding(embedding, base_directory, dataset_name, embedding_method, time_start, time_end):
+    file_name = base_directory + dataset_name + "-" + \
+        embedding_method + "-" + \
+        "time" + str(time_start) + "to" + str(time_end) + \
+        ".embedding.npy"
+    np.save(file_name, embedding)
 
 def print_array(array_list):
     from matplotlib import pyplot as plt

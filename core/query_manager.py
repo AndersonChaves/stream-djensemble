@@ -9,9 +9,13 @@ class QueryManager():
 
     def execute_queries(self, data_buffer, models_manager,
                            dataset_manager, cluster_manager):
+        execution_benchmarks = {}
         self.cluster_manager = cluster_manager
-        for id, query in self.continuous_query.items():
-            self.perform_continuous_query(query, data_buffer, models_manager, dataset_manager)
+        for query_id, query in self.continuous_query.items():
+            query_execution_benchmarks = self.perform_continuous_query(query, data_buffer, models_manager, dataset_manager)
+            for key, value in query_execution_benchmarks.items():
+                execution_benchmarks[query_id + "_" + key] = value
+        return execution_benchmarks
 
     def __init__(self, query_dir, notifier_list: list = None):
         files = os.listdir(query_dir)
@@ -24,6 +28,7 @@ class QueryManager():
     def perform_continuous_query(self, query: ContinuousQuery,
                                  data_buffer: np.array,
                                  models_manager, dataset_manager):
+        query_benchmarks = {}
         start_query = time.time()
         # 1. Get spatial region from the query
         x1, x2 = query.get_query_endpoints()
@@ -39,7 +44,6 @@ class QueryManager():
         # 3. Get corresponding clustering from data buffer (gld window)
         # tiling is a dict {tile_id: {'start': (x1). 'end': (x2), centroid: <centroid-coordinate>}
         if self.cluster_manager.is_global_clustering():
-
             tiling_metadata = self.cluster_manager.get_tiling_metadata()
             intersecting_tiles = self.get_intersecting_tiles(tiling_metadata, x1, x2)
             all_tiles_keys = list(tiling_metadata.keys())
@@ -60,6 +64,12 @@ class QueryManager():
         # 5. Get best model for each tile
         self.log("--------------------- CALCULATE ALLOCATION COSTS -------------------------------")
         ensemble = self.get_lower_cost_combination(error_estimative)
+        i = 0
+        for key, value in ensemble.items():
+            query_benchmarks["TILE_" + str(i) + "_MODEL"] = str(value[0])
+            query_benchmarks["TILE_" + str(i) + "_EST_ERROR"] = str(value[1])
+            i += 1
+
         self.log("Best Ensemble: " + str(ensemble))
         chk_5 = time.time()
 
@@ -101,6 +111,10 @@ class QueryManager():
         self.log("4.--Time to get tile centroid series: " + str(round(chk_4 - chk_3, 5)))
         self.log("5.--Time to select best model: " + str(round(chk_5 - chk_4, 5)))
         self.log("6.--Time to Perform model prediction: " + str(round(chk_6 - chk_5, 5)))
+
+        query_benchmarks["QUERY_MODEL_PREDICTION_TIME"] = str(round(chk_6 - chk_5, 5))
+        query_benchmarks["QUERY_EXECUTION_TIME"] = str(round(chk_6 - start_query, 5))
+        return query_benchmarks
 
     def perform_prediction(self, data_window: np.array, learner: Learner, tile_metadata: dict):
         tile_lat, tile_long = list(tile_metadata["lat"]), list(tile_metadata["long"])

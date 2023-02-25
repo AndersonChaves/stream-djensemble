@@ -7,6 +7,8 @@ from core.cluster_manager import ClusterManager
 from core.models_manager import ModelsManager
 import core.view
 import core.utils as ut
+import core.categorization as ct
+import pandas as pd
 
 MAXIMUM_COST = 999999
 
@@ -23,8 +25,13 @@ class DJEnsemble:
         ut.create_directory_if_not_exists(self.figures_directory)
         self.config_manager = config_manager
         self.notifier_list = [] if notifier_list is None else notifier_list
+        self.dataset_name = "EMPTY_DS_NAME"
         self.start_modules()
         self.start_time = str(datetime.datetime.now())
+        self.t_current = -1
+        self.clustering_directory = "results/clustering/"
+        self.benchmarks = {}
+        self.pandas_benchmarks = None
 
     # --------------------------------------------------------------
     # Model initialization functions -------------------------------
@@ -48,6 +55,7 @@ class DJEnsemble:
         if self.config_manager == None:
             raise ("Dataset Manager Initialization Error: No configurations defined")
         ds_path = self.config_manager.get_config_value("dataset_path")
+        self.dataset_name = ut.get_file_name_from_path(ds_path)
         self.dataset_manager = DatasetManager(ds_path)
         self.dataset_manager.loadDataset(ds_attribute=self.config_manager.get_config_value("target_attribute"))
 
@@ -76,7 +84,7 @@ class DJEnsemble:
 
         if self.config_manager.get_config_value("clusterization_mode") == 'static':
             static_clusterization_range = eval(self.config_manager.get_config_value("static_clusterization_range"))
-            self.log("Performing Global Clustering and Tiling: Frame" + str(0) + " to " + str(static_clusterization_range))
+            self.log("Performing global Clustering and Tiling: Frame" + str(0) + " to " + str(static_clusterization_range))
             self.start_global_clustering = time.time()
             # PERFORM STATIC CLUSTERING - GLOBAL
             if self.config_manager.get_config_value("clusterization_mode") == 'static':
@@ -84,7 +92,7 @@ class DJEnsemble:
                 self.cluster_manager.perform_global_static_clustering(clusterization_window, label="time0to" + str(static_clusterization_range))
                 self.cluster_manager.perform_global_static_tiling(
                     self.dataset_manager.read_window(0, static_clusterization_range))
-                self.log("Global Clustering and Tiling Performed, total time: " + str(
+                self.log("global Clustering and Tiling Performed, total time: " + str(
                     time.time() - self.start_global_clustering))
                 self.log("Number of Tiles: " + str(self.cluster_manager.get_current_number_of_tiles()))
             else:
@@ -97,15 +105,17 @@ class DJEnsemble:
         self.log("End of offline stage, total time: " + str(time.time() - self.start_cef))
 
     def run_online_step(self, single_iteration=True, t_start=-1):
+
         if t_start == -1:
             t_start = eval(self.config_manager.get_config_value("dataset_start"))
         window_size = eval(self.config_manager.get_config_value("window_size"))
         self.clustering_behavior = self.config_manager.get_config_value("series_clustering_behavior")
-        self.start_online = time.time()
+
         self.log("Measuring online statistics... ")
         data_stream_active = True
         self.t_current = t_start
         self.data_buffer = np.empty(self.get_buffer_shape())
+
         while data_stream_active:
             self.log("--- Reading new Record t: " + str(self.t_current))
             data_matrix = self.read_record(self.t_current)
@@ -115,26 +125,68 @@ class DJEnsemble:
             self.log("Time generating visualization: " + str(time.time()-start_frame_visualization))
 
             if len(self.data_buffer) >= window_size:
+                self.start_window = time.time()
                 #self.update_frame_visualization()
                 if self.config_manager.get_config_value("clusterization_mode") == 'dynamic':
                     start_clusterization = time.time()
-                    self.update_clusters_online(self.data_buffer)
+                    clustering_benchmarks = self.update_clusters_online(self.data_buffer)
                     self.log("Time for Clusterization: " + str(time.time() - start_clusterization))
+                else:
+                    clustering_benchmarks = {"Clustering Mode" : "Static"}
 
-                self.perform_continuous_queries(self.query_manager, self.data_buffer,
+                query_execution_benchmarks = self.perform_continuous_queries(self.query_manager, self.data_buffer,
                                                 self.models_manager, self.dataset_manager)
-                self.evaluate_error(self.read_record(self.t_current+1), self.query_manager)
+                error_banchmarks = self.evaluate_error(self.read_record(self.t_current+1), self.query_manager)
                 #if self.t_current % 200 == 0:
                 #self.update_window_visualization()
                 self.data_buffer = np.empty(self.get_buffer_shape())
                 if single_iteration:
                     data_stream_active = False
+                window_time = time.time() - self.start_window
+                self.log("Window took " + str(window_time) + "secs")
+
+                self.update_all_benchmarks(clustering_benchmarks,
+                                           query_execution_benchmarks,
+                                           error_banchmarks,
+                                           window_time)
+
+
             self.t_current += 1
-        self.log("Iteration took " + str(time.time() - self.start_online) + "secs")
+
+
         self.save_configurations()
 
     def get_buffer_shape(self):
         return (0,) + self.dataset_manager.get_spatial_shape()
+
+    def update_all_benchmarks(self,
+                              clustering_benchmarks,
+                              query_execution_benchmarks,
+                              error_banchmarks,
+                              window_time):
+        self.benchmarks[self.t_current] = {}
+        self.benchmarks[self.t_current].update(clustering_benchmarks)
+        self.benchmarks[self.t_current].update(query_execution_benchmarks)
+        self.benchmarks[self.t_current].update(error_banchmarks)
+        self.benchmarks[self.t_current]["TOTAL_WINDOW_TIME"] = window_time
+
+        if self.pandas_benchmarks is None:
+            self.pandas_benchmarks = pd.DataFrame(
+                self.benchmarks[self.t_current], index=[self.t_current]
+            )
+        else:
+            row = pd.DataFrame(
+                self.benchmarks[self.t_current], index=[self.t_current]
+            )
+            self.pandas_benchmarks = self.pandas_benchmarks.append(row)
+        self.pandas_benchmarks.to_csv(
+            self.results_directory +
+            ut.get_file_name_from_path(
+                self.config_manager.config_file_path
+            ).split('.')[0] +
+            "___" + str(self.start_time) + ".csv"
+        )
+
 
     # --------------------------------------------------------------
     # Offline Functions --------------------------------------------
@@ -152,26 +204,55 @@ class DJEnsemble:
 
     def update_clusters_online(self, data_buffer: np.array):
         if self.cluster_manager.clustering_behavior == 'local':
-            self.cluster_manager.update_clustering_local(data_buffer, self.query_manager)
+            clustering_benchmarks = self.cluster_manager.update_clustering_local(data_buffer, self.query_manager)
         else:
-            self.cluster_manager.update_global_clustering(data_buffer) # Not tested yet
+            embedding_method = self.cluster_manager.embedding_method
+            embedding = ct.load_embedding_if_exists(
+                                             self.clustering_directory,
+                                             self.dataset_name,
+                                             embedding_method,
+                                             self.t_current +1 - len(data_buffer),
+                                             self.t_current +1
+            )
+            w_start, w_end = self.t_current - len(data_buffer), self.t_current
+            clustering_benchmarks = self.cluster_manager.update_global_clustering(
+                data_buffer, embeddings_list=embedding
+            )
+
+            # ds_path = self.config_manager.get_config_value("dataset_path")
+            # self.dataset_name = ut.get_file_name_from_path(ds_path)
+            if embedding is None:
+                file_name = self.clustering_directory + self.dataset_name
+                file_name += "-" + embedding_method + "-time" + \
+                              str(self.t_current+1 - len(data_buffer)) + "to" + \
+                               str(self.t_current+1) + ".embedding"
+
+                np.save(file_name, self.cluster_manager.global_series_embedding)
+
+
+        return clustering_benchmarks
 
     def perform_continuous_queries(self, query_manager, data_buffer, models_manager, dataset_manager):
         self.log("Executing query: Window Allocation t=" + str(self.t_current))
-        query_manager.execute_queries(data_buffer, models_manager, dataset_manager, self.cluster_manager)
+        query_execution_benchmarks = query_manager.execute_queries(data_buffer, models_manager, dataset_manager, self.cluster_manager)
+        return query_execution_benchmarks
 
     def evaluate_error(self, real_next_frame, query_manager: QueryManager):
+        error_benchmarks = {}
         for query_id in self.query_manager.get_all_query_ids():
             continuous_query = self.query_manager.get_continuous_query(query_id)
             x1, x2 = continuous_query.get_query_endpoints()
             query_next_frame = self.dataset_manager.filter_frame_by_query_region(real_next_frame, x1, x2)
             continuous_query.update_rmse(query_next_frame)
 
+            error_history = continuous_query.config_parameters["Error History"]
             self.log("Query error updated: " + str(query_id) +
-                     str(continuous_query.config_parameters["Error History"]))
+                     str(error_history))
             self.log("Average RMSE: " + str(query_id) +
                      str(continuous_query.config_parameters["Average RMSE"]))
 
+            error_benchmarks[query_id + "_ERROR"] = eval(error_history)[-1]
+        return error_benchmarks
 
     def set_config_manager(self, config_manager):
         self.config_manager = config_manager

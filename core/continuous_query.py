@@ -3,6 +3,7 @@ from core.config_manager import ConfigManager
 from core.clustering_strategy import ClusteringStrategy
 import core.categorization as ct
 import core.utils as ut
+import time
 
 class ContinuousQuery(ConfigManager):
     def __init__(self, config_file_path, query_id):
@@ -47,7 +48,9 @@ class ContinuousQuery(ConfigManager):
         self.tiling_is_updated = False
 
     def update_clustering(self, dataset):
+        benchmarks = {}
         method = self.get_config_value("embedding_method")
+        start_clustering_time = time.time()
         if not self.is_clustering_initialized():
             self.initialize_clustering(dataset, clustering_method=method)
         else:
@@ -56,8 +59,18 @@ class ContinuousQuery(ConfigManager):
             self.intracluster_variance = self.__calculate_intracluster_variance(embedding, clustering)
             self.embedding_frame = np.reshape(embedding, (lat, long, embedding.shape[-1]))  # Number of GLD parameters = 4
             self.clustering_frame = np.reshape(clustering, newshape=(lat, long))
+
+        benchmarks["LOCAL_CLUSTERING_METHOD"] = method
+        benchmarks["CLUSTERING_TIME"] = time.time() - start_clustering_time
+
+        benchmarks["N_CLUSTERS"] = len(np.unique(self.clustering))
+        start_tilinging_time = time.time()
         self.perform_tiling(dataset)
+        benchmarks["TILING_TIME"] = time.time() - start_tilinging_time
+        benchmarks["TILING_METHOD"] = self.config_parameters["tiling_method"]
+        benchmarks["N_TILES"] = len(self.get_tiling_metadata().keys())
         self.tiling_is_updated = True
+        return benchmarks
 
     def get_current_clustering(self):
         if self.is_clustering_initialized():
