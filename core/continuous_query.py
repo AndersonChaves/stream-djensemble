@@ -19,7 +19,7 @@ class ContinuousQuery(ConfigManager):
         self.convolutional_models_path = self.config_parameters["convolutional_models_path"]
 
         self.query_id = query_id
-        self.clustering = None
+        self.clustering_frame = None
         self.clustering_strategy = None
         self.tiling_is_updated = False
         self.rmse_history = []
@@ -63,7 +63,7 @@ class ContinuousQuery(ConfigManager):
         benchmarks["LOCAL_CLUSTERING_METHOD"] = method
         benchmarks["CLUSTERING_TIME"] = time.time() - start_clustering_time
 
-        benchmarks["N_CLUSTERS"] = len(np.unique(self.clustering))
+        benchmarks["N_CLUSTERS"] = len(np.unique(self.clustering_frame))
         start_tilinging_time = time.time()
         self.perform_tiling(dataset)
         benchmarks["TILING_TIME"] = time.time() - start_tilinging_time

@@ -24,8 +24,6 @@ def run_from_file(global_configurations_path, cfg_number, results_file_name):
       djensemble.log("**************Iteration end. Start Time:" + str(cur_time) + "**************")
 
 if __name__ == '__main__':
-    run_from_file(global_configurations_path_config_3, 3, "3.out")
-
     run_from_file(global_configurations_path_config_1, 1, "1.out")
     run_from_file(global_configurations_path_config_2, 2, "2.out")
     run_from_file(global_configurations_path_config_3, 3, "3.out")

@@ -5,7 +5,7 @@ from djensemble import DJEnsemble
 from core.config_manager import ConfigManager
 
 
-# Global Configurations
+# global Configurations
 global_configurations_path_config_1 = "experiment-metadata/djensemble-exp2-cfg1.config"
 global_configurations_path_config_2 = "experiment-metadata/djensemble-exp2-cfg2.config"
 
